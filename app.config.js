@@ -7,7 +7,7 @@
 window.MONITORING_CONFIG = Object.freeze({
   DEMO_MODE: false,
 API_URL: 'https://irqovqzrdvqmuuuvxcmt.supabase.co/functions/v1/monitoring-api',
-  WEEKENDS_ENABLED: null,
+WEEKENDS_ENABLED: false,
   FIRST_DATE: '2026-10-26',
   LAST_DATE: '2026-11-27',
   TIMEZONE: 'Asia/Seoul'
