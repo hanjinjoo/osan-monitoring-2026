@@ -1,0 +1,530 @@
+[
+  {
+    "id": "major-001",
+    "name": "ATLAS 스포츠 의학동아리",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-002",
+    "name": "AT동아리",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-003",
+    "name": "아나토미",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-004",
+    "name": "Forest",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-005",
+    "name": "휴니멀",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-006",
+    "name": "아트플레이",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-007",
+    "name": "Skyra",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-008",
+    "name": "호크마",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-009",
+    "name": "B&D",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-010",
+    "name": "모여봐요 오산의 숲",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-011",
+    "name": "바코드(Barcode)",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-012",
+    "name": "아띠",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-013",
+    "name": "도수재활",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-014",
+    "name": "경찰전문체력동아리",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-015",
+    "name": "겟잇뷰티",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-016",
+    "name": "유연회",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-017",
+    "name": "가람회",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-018",
+    "name": "소방체육동아리",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-019",
+    "name": "Build",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-020",
+    "name": "PLOP",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-021",
+    "name": "O.S.T",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-022",
+    "name": "다정 유도 동아리",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-023",
+    "name": "이따(식품산업 기사 및 기능사, 기사 취득 동아리)",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-024",
+    "name": "RAVENS",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-025",
+    "name": "CUE",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-026",
+    "name": "군사체력단련동아리",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-027",
+    "name": "세공실",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-028",
+    "name": "돌봄이웃",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-029",
+    "name": "형사판례 연구회",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-030",
+    "name": "뷰티인바이오",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-031",
+    "name": "비바! 호텔리어",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-032",
+    "name": "드론어스",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-033",
+    "name": "서포터즈",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-034",
+    "name": "Secure Lab",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-035",
+    "name": "job shadowing",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-036",
+    "name": "뷰티콩",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-001",
+    "name": "와이티티",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-002",
+    "name": "울타리",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-003",
+    "name": "오셜",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-004",
+    "name": "도그바이저",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-005",
+    "name": "헤라클라스",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-006",
+    "name": "취얼~업",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-007",
+    "name": "금화도감",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-008",
+    "name": "취신(취업의신)",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-009",
+    "name": "T-MAN",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-010",
+    "name": "취뽀",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-011",
+    "name": "취업하고싶죠",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-012",
+    "name": "Safety L5",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-013",
+    "name": "드림 캐쳐스",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-014",
+    "name": "스케치2005",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-015",
+    "name": "취업 JOB GO 뷰티 JOB GO",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-016",
+    "name": "보하마(보안경비업체 취업하고 싶은 마음)",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-017",
+    "name": "편준생 모여라",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-018",
+    "name": "고진감래",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "employment-019",
+    "name": "틱 : 온(Tik : ON)",
+    "category": "employment",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-037",
+    "name": "E.S.I",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-038",
+    "name": "wllcan",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-039",
+    "name": "메카니쿠스",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-040",
+    "name": "Safety L1",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-041",
+    "name": "마이크로프로세서",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-042",
+    "name": "전자기기속의 반도체뽀개기",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "major-043",
+    "name": "생활속의반도체",
+    "category": "major",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-001",
+    "name": "CCC",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-002",
+    "name": "오산대학교 댄스부 eve",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-003",
+    "name": "배드민턴",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-004",
+    "name": "오산vc",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-005",
+    "name": "체력단련 동아리",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-006",
+    "name": "한울타리",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-007",
+    "name": "오산 클로저스",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-008",
+    "name": "RE:ON",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-009",
+    "name": "fc오산",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "general-010",
+    "name": "영어회화",
+    "category": "general",
+    "reservation_group": "integrated"
+  },
+  {
+    "id": "startup-001",
+    "name": "DTC",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-002",
+    "name": "피에스타",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-003",
+    "name": "파티시에",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-004",
+    "name": "복지시대",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-005",
+    "name": "뷰티아트",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-006",
+    "name": "암페어",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-007",
+    "name": "3D think pro",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-008",
+    "name": "샐러오장",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-009",
+    "name": "사회적협동조합만들기",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-010",
+    "name": "그루트(Guroot)",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-011",
+    "name": "F.M 창업동아리",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-012",
+    "name": "D.R.G",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-013",
+    "name": "레이븐즈 이스포츠 (Ravens E-sports)",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-014",
+    "name": "맛GO멋GO",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-015",
+    "name": "파이어맨",
+    "category": "startup",
+    "reservation_group": "startup"
+  },
+  {
+    "id": "startup-016",
+    "name": "VKC&how",
+    "category": "startup",
+    "reservation_group": "startup"
+  }
+]

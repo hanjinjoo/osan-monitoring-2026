@@ -1,0 +1,11 @@
+{
+  "name": "osan-club-monitoring-scheduler",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "2026-2 오산대학교 동아리 모니터링 예약 웹사이트",
+  "scripts": {
+    "start": "python -m http.server 5173",
+    "test": "node --test tests/*.test.mjs"
+  }
+}
