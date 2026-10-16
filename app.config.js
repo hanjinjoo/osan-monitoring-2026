@@ -5,8 +5,8 @@
  * 주말 예약은 운영자가 확정 후 true/false로 바꾸세요. null일 때 주말은 예약 불가입니다.
  */
 window.MONITORING_CONFIG = Object.freeze({
-  DEMO_MODE: true,
-  API_URL: '',
+  DEMO_MODE: false,
+API_URL: 'https://irqovqzrdvqmuuuvxcmt.supabase.co/functions/v1/monitoring-api',
   WEEKENDS_ENABLED: null,
   FIRST_DATE: '2026-10-26',
   LAST_DATE: '2026-11-27',
