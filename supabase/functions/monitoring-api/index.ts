@@ -93,7 +93,7 @@ Deno.serve(async(req:Request)=>{
    if(!group)return json('등록되지 않은 담당자 번호입니다.',401);
    return json({group,token:await makeToken(group)});
   }
-  if(['update','cancel','block','unblock'].includes(action)){
+  if(['update','cancel','block','block-day','unblock'].includes(action)){
    const staffGroup=await checkToken(body.token);
    if(!staffGroup)return json('관리자 인증이 만료되었거나 권한이 없습니다.',401);
    if(action==='update'){
@@ -106,6 +106,10 @@ Deno.serve(async(req:Request)=>{
     return json(await rpc('monitoring_cancel_booking',{p_id:body.reservationId,p_group:staffGroup}));
    }
    if(body.group!==staffGroup)return json('담당하는 동아리 그룹이 아닙니다.',403);
+   if(action==='block-day'){
+    requireSlot(body.date,'09:00');
+    return json(await rpc('monitoring_block_day',{p_group:staffGroup,p_date:body.date,p_weekends:weekendEnabled}));
+   }
    if(!isDate(body.date)||!isTime(body.time))return json('날짜 또는 시간을 확인해 주세요.',400);
    if(action==='block'){
     requireSlot(body.date,body.time);
