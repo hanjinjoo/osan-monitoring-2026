@@ -10,6 +10,7 @@ export class Service {
         case 'update':return this.demo.update(data);
         case 'cancel':return this.demo.cancel(data);
         case 'block':return this.demo.block(data);
+        case 'block-day':return this.demo.blockDay(data);
         case 'unblock':return this.demo.unblock(data);
       }
       throw Error('지원되지 않는 요청입니다.');

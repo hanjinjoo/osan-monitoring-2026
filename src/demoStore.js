@@ -49,6 +49,17 @@ export class DemoService {
     if(!db.blocks.some(b=>b.reservation_group===group&&b.blocked_date===date&&b.blocked_time===time)) db.blocks.push({id:uuid(),reservation_group:group,blocked_date:date,blocked_time:time});
     write(db);return {success:true};
   }
+  async blockDay({token,date,group}) {
+    this._check(token,group);this._valid(date,TIMES[0]);
+    const db=read();
+    if(db.reservations.some(r=>r.status==='confirmed'&&r.reservation_group===group&&r.reservation_date===date))
+      throw Error('이 날짜에는 이미 예약된 동아리가 있어 전체 차단할 수 없습니다. 기존 예약은 유지됩니다.');
+    for(const time of TIMES){
+      if(!db.blocks.some(b=>b.reservation_group===group&&b.blocked_date===date&&b.blocked_time===time))
+        db.blocks.push({id:uuid(),reservation_group:group,blocked_date:date,blocked_time:time});
+    }
+    write(db);return {success:true,blocked_slots:TIMES.length};
+  }
   async unblock({token,date,time,group}) {
     this._check(token,group);
     const db=read();db.blocks=db.blocks.filter(b=>!(b.reservation_group===group&&b.blocked_date===date&&b.blocked_time===time));write(db);return {success:true};

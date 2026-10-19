@@ -119,7 +119,10 @@ function modalHtml(){
  }
  if(m.type==='block'){
   const blocks=[...app.blocks].sort((a,b)=>a.blocked_date.localeCompare(b.blocked_date)||a.blocked_time.localeCompare(b.blocked_time));
-  return modalWrap('담당자 시간 차단',`<p>자신의 예약 그룹에서만 선택한 시간을 예약 불가로 설정합니다.</p><div class="field"><label for="block-date">차단 날짜</label><input class="control" type="date" id="block-date" min="${cfg.FIRST_DATE}" max="${cfg.LAST_DATE}" value="${esc(m.date)}"></div><div class="field"><label for="block-time">차단 시각</label><select id="block-time" class="control">${timeOpts(m.date,m.time,app.adminGroup)}</select></div><div class="modal-actions"><button class="button" data-action="close">닫기</button><button class="button primary" data-action="commit-block" ${app.busy?'disabled':''}>시간 차단</button></div><div class="field"><label>현재 차단된 시간 (${blocks.length}개)</label><div class="block-list">${blocks.length?blocks.map(b=>`<span class="block-chip">${esc(b.blocked_date)} ${esc(b.blocked_time.slice(0,5))}<button data-action="unblock" data-date="${esc(b.blocked_date)}" data-time="${esc(b.blocked_time.slice(0,5))}" aria-label="시간 차단 해제">×</button></span>`).join(''):'<span class="subtle">차단된 시간이 없습니다.</span>'}</div></div>`);
+  const wholeDayOption=`<option value="__all_day__" ${m.time==='__all_day__'?'selected':''}>선택한 날짜 전체 차단 (32개 시간)</option>`;
+  const timeOptions=timeOpts(m.date,m.time,app.adminGroup).replace('</option>',`</option>${wholeDayOption}`);
+  const dayHint=m.time==='__all_day__'?'<div class="field-help">09:00~17:45 전체 32개 시간을 차단합니다(12:00~12:45 제외). 해당 날짜에 기존 예약이 하나라도 있으면 전체 차단은 실행되지 않습니다.</div>':'';
+  return modalWrap('담당자 시간 차단',`<p>자신의 예약 그룹에서만 선택한 시간을 예약 불가로 설정합니다.</p><div class="field"><label for="block-date">차단 날짜</label><input class="control" type="date" id="block-date" min="${cfg.FIRST_DATE}" max="${cfg.LAST_DATE}" value="${esc(m.date)}"></div><div class="field"><label for="block-time">차단 시각</label><select id="block-time" class="control">${timeOptions}</select>${dayHint}</div><div class="modal-actions"><button class="button" data-action="close">닫기</button><button class="button primary" data-action="commit-block" ${app.busy?'disabled':''}>시간 차단</button></div><div class="field"><label>현재 차단된 시간 (${blocks.length}개)</label><div class="block-list">${blocks.length?blocks.map(b=>`<span class="block-chip">${esc(b.blocked_date)} ${esc(b.blocked_time.slice(0,5))}<button data-action="unblock" data-date="${esc(b.blocked_date)}" data-time="${esc(b.blocked_time.slice(0,5))}" aria-label="시간 차단 해제">×</button></span>`).join(''):'<span class="subtle">차단된 시간이 없습니다.</span>'}</div></div>`);
  }
  if(m.type==='missing'){
   const occupied=new Set(activeBookings().map(r=>r.club_id));const missing=app.clubs.filter(c=>c.reservation_group===app.adminGroup&&!occupied.has(c.id));
@@ -188,7 +191,13 @@ root.addEventListener('click',async e=>{
  if(action==='admin-block'){app.modal={type:'block',date:cfg.FIRST_DATE,time:''};render();return}
  if(action==='commit-block'){
   if(!app.modal.time){app.modal.error='차단할 시간을 선택해 주세요.';render();return}
-  await execute('block',{token:app.token,date:app.modal.date,time:app.modal.time,group:app.adminGroup},'선택한 시간이 차단되었습니다.');return;
+  if(app.modal.time==='__all_day__'){
+   if(!confirm(`${app.modal.date}의 전체 32개 예약 시간대를 차단하시겠습니까?\n\n이미 확정된 예약이 하나라도 있으면 변경 없이 중단됩니다.`))return;
+   await execute('block-day',{token:app.token,date:app.modal.date,group:app.adminGroup},'선택한 날짜의 전체 예약 시간(32개)이 차단되었습니다.');
+  }else{
+   await execute('block',{token:app.token,date:app.modal.date,time:app.modal.time,group:app.adminGroup},'선택한 시간이 차단되었습니다.');
+  }
+  return;
  }
  if(action==='unblock'){
   if(!confirm(`${date} ${time} 시간 차단을 해제하시겠습니까?`))return;
@@ -214,7 +223,7 @@ root.addEventListener('change',e=>{
  if(e.target.id==='edit-date'&&app.modal){app.modal.date=e.target.value;app.modal.time='';app.modal.error=null;render();return}
  if(e.target.id==='edit-time'&&app.modal){app.modal.time=e.target.value;app.modal.error=null;return}
  if(e.target.id==='block-date'&&app.modal){app.modal.date=e.target.value;app.modal.time='';app.modal.error=null;render();return}
- if(e.target.id==='block-time'&&app.modal){app.modal.time=e.target.value;app.modal.error=null;return}
+ if(e.target.id==='block-time'&&app.modal){app.modal.time=e.target.value;app.modal.error=null;render();return}
  if(e.target.id==='admin-category'){app.adminFilter=e.target.value;render();return}
 });
 root.addEventListener('input',e=>{
