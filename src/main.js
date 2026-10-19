@@ -123,7 +123,11 @@ function modalHtml(){
  }
  if(m.type==='missing'){
   const occupied=new Set(activeBookings().map(r=>r.club_id));const missing=app.clubs.filter(c=>c.reservation_group===app.adminGroup&&!occupied.has(c.id));
-  return modalWrap(`미예약 동아리 (${missing.length}개)`,`<div style="max-height:53vh;overflow:auto">${missing.length?missing.map(c=>`<div style="padding:10px;border-bottom:1px solid #e8eef4"><strong>${esc(c.name)}</strong> <span class="tag gray">${CATEGORIES[c.category].label}</span></div>`).join(''):'<p>모든 동아리가 예약을 완료했습니다.</p>'}</div>${actions('확인','close')}`);
+  const categories=app.adminGroup==='startup'?['startup']:['major','employment','general'];
+  const selected=categories.includes(m.category)?m.category:categories[0];
+  const visible=missing.filter(c=>c.category===selected);
+  const categoryTabs=categories.length===1?'':`<div class='tabs' role='tablist' aria-label='미예약 동아리 유형'>${categories.map(key=>`<button type='button' role='tab' aria-selected='${selected===key}' class='tab' data-action='missing-category' data-value='${key}'>${CATEGORIES[key].label}<span class='tab-count'>${missing.filter(c=>c.category===key).length}</span></button>`).join('')}</div>`;
+  return modalWrap(`미예약 동아리 (${missing.length}개)`,`${categoryTabs}<div style="max-height:53vh;overflow:auto">${visible.length?visible.map(c=>`<div style="padding:10px;border-bottom:1px solid #e8eef4"><strong>${esc(c.name)}</strong> <span class="tag gray">${CATEGORIES[c.category].label}</span></div>`).join(''):missing.length?'<p>선택한 유형의 미예약 동아리가 없습니다.</p>':'<p>모든 동아리가 예약을 완료했습니다.</p>'}</div>${actions('확인','close')}`);
  }
  return '';
 }
@@ -189,6 +193,10 @@ root.addEventListener('click',async e=>{
  if(action==='unblock'){
   if(!confirm(`${date} ${time} 시간 차단을 해제하시겠습니까?`))return;
   startBusy();try{await service.call('unblock',{token:app.token,date,time,group:app.adminGroup});await loadState();app.modal={type:'block',date,time:''};app.busy=false;flash('시간 차단을 해제했습니다.')}catch(ex){modalError(ex)}return;
+ }
+ if(action==='missing-category'&&app.modal?.type==='missing'){
+  if((app.adminGroup==='startup'?['startup']:['major','employment','general']).includes(value)){app.modal={...app.modal,category:value};render()}
+  return;
  }
  if(action==='admin-missing'){app.modal={type:'missing'};render();return}
  if(action==='export'){csvExport();flash('예약 현황 CSV 파일을 생성했습니다.');return}
