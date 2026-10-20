@@ -196,6 +196,15 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
  if(body.action==='photo-retry'){
   const {photo}=await photoBelongs(body.photoId,group);
   if(photo.upload_status!=='pending')throw fail(409,'이미 업로드가 완료된 사진입니다.');
+  const path=photo.storage_path;
+  const pos=path.lastIndexOf('/');
+  const {data:stored,error:storedError}=await supabase.storage.from(BUCKET).list(path.slice(0,pos),{search:path.slice(pos+1),limit:10});
+  if(!storedError){
+   const file=(stored||[]).find(x=>x.name===path.slice(pos+1));
+   if(file&&Number(file.metadata?.size)===photo.file_size){
+    return {photoId:photo.id,alreadyUploaded:true};
+   }
+  }
   const {data,error}=await supabase.storage.from(BUCKET).createSignedUploadUrl(photo.storage_path);
   if(error||!data)throw fail(500,'재업로드 권한을 발급하지 못했습니다.');
   const base=env('SUPABASE_URL').replace(/\.supabase\.co$/i,'.storage.supabase.co');
