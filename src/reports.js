@@ -10,6 +10,26 @@ const statusLabel={missing:'미작성',draft:'작성 중',completed:'작성 완�
 const fmtBytes=n=>n>=1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.max(1,Math.ceil(n/1024))+' KB';
 const selfState=()=>({page:'list',items:[],filter:'all',category:'all',search:'',selected:null,photos:[],pendingPhoto:null,report:null,draft:null,dirty:false,saving:false,revision:0,photoUploads:[],message:'',error:'',loading:true});
 let state=selfState(), autosaveTimer=null, activeUploads=new Set();
+let browserTusPromise=null;
+function loadBrowserTus(){
+ // tus-js-client의 npm/ESM 기본 진입점은 일부 CDN에서 Node용으로 해석될 수 있다.
+ // 공식 브라우저 UMD(dist) 번들만 로드하여 iPhone Safari File/Blob을 안전하게 처리한다.
+ if(window.tus?.Upload)return Promise.resolve(window.tus);
+ if(!browserTusPromise){
+  browserTusPromise=new Promise((resolve,reject)=>{
+   const script=document.createElement('script');
+   script.src='https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js';
+   script.async=true;
+   script.onload=()=>{
+    if(window.tus?.Upload)resolve(window.tus);
+    else reject(new Error('사진 업로드 브라우저 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.'));
+   };
+   script.onerror=()=>reject(new Error('사진 전송 모듈을 다운로드하지 못했습니다. 인터넷 연결을 확인하고 재시도해 주세요.'));
+   document.head.appendChild(script);
+  }).catch(error=>{browserTusPromise=null;throw error});
+ }
+ return browserTusPromise;
+}
 const selectedScope=()=>state.items.find(x=>x.club_id===state.selected);
 function apiUrl(){
  const url=config.API_URL;
@@ -265,7 +285,7 @@ async function imageUpload(file,existing=null){
   record.status=signed.alreadyUploaded?'사진 전송 완료 · 저장 확인 중':'고화질 사진 전송 중';photoSectionUpdate();
   if(!signed.alreadyUploaded){
   // 브라우저 ESM 로드. tus-js-client는 Supabase 권장 resumable upload 방식.
-  const tus=await import('https://esm.sh/tus-js-client@4.3.1');
+  const tus=await loadBrowserTus();
   await new Promise((resolve,reject)=>{
    const upload=new tus.Upload(file,{
     endpoint:signed.tusEndpoint,
