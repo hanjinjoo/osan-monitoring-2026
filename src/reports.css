@@ -92,3 +92,6 @@
  .report-club-main strong{font-size:14px}
 }
 .report-failed-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
+
+.report-photo-preview{display:block;width:100%;border:0;background:transparent;padding:0;cursor:zoom-in}
+.report-photo-preview:focus-visible{outline:3px solid #87b7ef;outline-offset:-3px}
