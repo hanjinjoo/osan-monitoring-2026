@@ -4,7 +4,7 @@
 import {esc,CATEGORIES} from './utils.js';
 
 const TERM='2026-2', MAX_PHOTO=50_000_000;
-let root, config, group, token, onBack, bookings, view, sessionId=0;
+let root, config, group, token, onBack, onRoutePush, bookings, view, sessionId=0;
 const tabs={integrated:['major','employment','general'],startup:['startup']};
 const statusLabel={missing:'미작성',draft:'작성 중',completed:'작성 완료',not_conducted:'미실시'};
 const fmtBytes=n=>n>=1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.max(1,Math.ceil(n/1024))+' KB';
@@ -104,7 +104,7 @@ const draftFields=d=>({
 });
 function dateTimeFor(x){
  const booking=(bookings||[]).find(b=>b.club_id===x.club_id&&b.status==='confirmed');
- return {date:booking?.reservation_date||'',time:(booking?.reservation_time||'').slice(0,5)};
+ return {date:booking?.reservation_date||'',time:(booking?.reservation_time||'').slice(0,5),location:booking?.reservation_location||''};
 }
 function photoHtml(){
  const photos=state.photos.map(p=>'<div class="report-photo-tile" data-photo-id="'+esc(p.id)+'">'+
@@ -202,7 +202,7 @@ async function open(clubId){
   state.report=data.report;state.photos=data.photos;state.pendingPhoto=data.pendingPhoto||null;state.recoverable=data.recoverable||null;state.editMode=false;
   state.draft={...draftFields(data.report),
    monitoring_date:data.report?.monitoring_date||defaults.date,
-   monitoring_time:(data.report?.monitoring_time||defaults.time||'').slice(0,5)};
+   monitoring_time:(data.report?.monitoring_time||defaults.time||'').slice(0,5),monitoring_location:data.report?.monitoring_location||defaults.location};
   state.dirty=false;state.saving=false;state.revision=0;state.loading=false;render();
  }catch(e){state.loading=false;state.page='list';state.error=e.message;render()}
 }
@@ -274,14 +274,14 @@ async function showList(){
  if(state.dirty&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
   if(state.dirty&&!(await save('draft')))return;
  sessionId++;state.page='list';state.selected=null;state.loading=true;render();
- try{await loadList();state.loading=false;state.message='';state.error='';render()}catch(e){state.loading=false;state.error=e.message;render()}
+ try{await loadList();state.loading=false;state.message='';state.error='';render();return true}catch(e){state.loading=false;state.error=e.message;render();return false}
 }
 async function leave(){
  if(state.photoUploads.some(p=>p.error)&&!window.confirm('업로드 실패한 사진이 있습니다. 이 화면을 나가시겠습니까?'))return;
  if(activeUploads.size){setMessage('사진 업로드를 완료한 후 이동해 주세요.',true);return}
  if(state.page==='editor'&&state.dirty&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
   if(state.page==='editor'&&state.dirty&&!(await save('draft')))return;
- clearTimeout(autosaveTimer);sessionId++;root=null;onBack();
+ clearTimeout(autosaveTimer);sessionId++;root=null;onBack();return true;
 }
 async function imageUpload(file,existing=null){
  if(!file)return;
@@ -332,8 +332,8 @@ async function bind(){
  root.addEventListener('click',async e=>{
   const b=e.target.closest('[data-r-action]');if(!b)return;
   const {rAction:action,id,value}=b.dataset;
-  if(action==='back'){await leave();return}
-  if(action==='list'){await showList();return}
+  if(action==='back'){if(await leave())onRoutePush?.('admin');return}
+  if(action==='list'){if(await showList())onRoutePush?.('reports');return}
   if(action==='reload'){await reload();return}
    if(action==='stat-filter'){state.filter=value;state.category='all';state.search='';render();return}
    if(action==='edit-report'){state.editMode=true;render();return}
@@ -352,7 +352,7 @@ async function bind(){
     return;
    }
   if(action==='category'){state.category=value;render();return}
-  if(action==='open'){await open(id);return}
+  if(action==='open'){await open(id);if(state.page==='editor'&&!state.loading&&state.selected===id)onRoutePush?.('report/'+id);return}
   if(action==='save-draft'){await save('draft');return}
   if(action==='complete'){if(await save('completed'))await open(state.selected);return}
   if(action==='not-conducted'){if(await save('not_conducted'))await open(state.selected);return}
@@ -404,10 +404,25 @@ async function bind(){
 }
 function beforeUnload(e){if(state.dirty||activeUploads.size){e.preventDefault();e.returnValue=''}}
 export async function mountReports(element,opts){
- root=element;config=opts.config;group=opts.group;token=opts.token;onBack=opts.onBack;bookings=opts.bookings||[];
+ root=element;config=opts.config;group=opts.group;token=opts.token;onBack=opts.onBack;onRoutePush=opts.onRoutePush;bookings=opts.bookings||[];
  state=selfState();state.category='all';state.loading=true;render();
  // 한 페이지에서 한 번만 event handler 등록하고 다음 진입 시 갱신.
  if(!root.dataset.reportBound){root.dataset.reportBound='true';await bind();}
  try{await loadList();state.loading=false;render()}
  catch(e){state.loading=false;state.error='결과관리 서버가 아직 준비되지 않았거나 접속에 실패했습니다. '+e.message;render()}
+}
+
+/** Receive History API Back/Forward transitions (without pushing another entry). */
+export async function navigateReportRoute(route){
+ if(!root)return false;
+ if(route==='reports')return state.page==='list'?true:!!(await showList());
+ if(route.startsWith('report/')){
+  const id=route.slice(7);
+  if(state.page==='editor'&&state.selected===id)return true;
+  if(!state.items.some(item=>item.club_id===id))return false;
+  await open(id);
+  return state.page==='editor'&&state.selected===id&&!state.loading;
+ }
+ if(route==='admin'||route==='home')return !!(await leave());
+ return false;
 }
