@@ -180,7 +180,7 @@ root.addEventListener('click',async e=>{
  if(action==='login'){app.modal={type:'login'};render();return}
  if(action==='confirm-login'){
   const code=root.querySelector('#staff-code')?.value?.trim();if(!code){app.modal.error='사번을 입력해 주세요.';render();return}
-  startBusy();try{const result=await service.call('login',{code});app.adminGroup=result.group;app.token=result.token;app.adminSearch='';app.adminFilter='all';app.modal=null;await loadState();app.busy=false;routePush('admin');flash('담당자 인증이 완료되었습니다.')}catch(ex){modalError(ex)}return;
+  startBusy();try{const result=await service.call('login',{code});app.adminGroup=result.group;app.token=result.token;app.route='admin';app.adminSearch='';app.adminFilter='all';app.modal=null;await loadState();app.busy=false;routePush('admin');flash('담당자 인증이 완료되었습니다.')}catch(ex){modalError(ex)}return;
  }
  if(action==='logout'){routePush('home');app.adminGroup=null;app.token=null;app.adminSearch='';app.adminFilter='all';try{await loadState()}catch(ex){flash(ex.message,true)}render();return}
  if(action==='booking-confirm'){
