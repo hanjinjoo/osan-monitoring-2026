@@ -8,6 +8,8 @@ const clubs=JSON.parse(read('data/clubs.json'));
 const scopeSql=read('supabase/migrations/202610200001_monitoring_reports.sql');
 const deptSql=read('supabase/migrations/202610200002_report_departments.sql');
 const onePhotoSql=read('supabase/migrations/202610200003_one_photo_per_report.sql');
+const rateSql=read('supabase/migrations/202610200004_staff_login_rate_limit.sql');
+const loginApi=read('supabase/functions/monitoring-api/index.ts');
 const frontend=read('src/reports.js');
 const css=read('src/reports.css');
 const api=read('supabase/functions/monitoring-reports/index.ts');
@@ -92,4 +94,15 @@ test('한 동아리 증빙사진은 정확히 1장, 새 사진 실패 시 기존
  assert.match(frontend,/discard-pending/);
  assert.match(frontend,/if\(state\.photos\.length!==1\)/);
  assert.match(frontend,/await imageUpload\(files\[0\]\)/);
+});
+
+test('담당자 로그인 횟수 제한은 사번을 DB에 저장하지 않고 검증한다',()=>{
+ assert.match(rateSql,/monitoring_staff_login_rate_limit/);
+ assert.match(rateSql,/attempts<=20/);
+ assert.match(rateSql,/client_hash text PRIMARY KEY/);
+ assert.match(rateSql,/REVOKE ALL ON FUNCTION public\.monitoring_staff_login_rate_limit/);
+ assert.match(loginApi,/if\(!\(await loginAllowed\(req\)\)\)/);
+ assert.match(loginApi,/crypto\.subtle\.sign/);
+ assert.match(loginApi,/if\(action==='create'\)/);
+ assert.match(loginApi,/if\(action==='state'\)/);
 });
