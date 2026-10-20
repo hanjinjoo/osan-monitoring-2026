@@ -122,6 +122,6 @@ REVOKE ALL ON public.monitoring_report_scope,
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.monitoring_report_scope,
  public.monitoring_reports, public.monitoring_report_photos,
  public.monitoring_report_history TO service_role;
-GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO service_role;
+GRANT USAGE,SELECT ON SEQUENCE public.monitoring_report_history_id_seq TO service_role;
 
 COMMIT;
