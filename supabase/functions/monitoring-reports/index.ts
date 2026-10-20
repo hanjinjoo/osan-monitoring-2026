@@ -74,6 +74,7 @@ async function photoBelongs(photoId:unknown,group:'integrated'|'startup'){
  const report=await queryOne('monitoring_reports','id',photo.report_id);
  if(!report)throw fail(404,'결과 기록을 찾을 수 없습니다.');
  await findScope(report.club_id,group);
+ if(report.deleted_at)throw fail(409,'삭제된 결과 기록의 사진은 수정할 수 없습니다.');
  return {photo,report};
 }
 function field(value:unknown,name:string,max:number){
@@ -93,7 +94,7 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   const ids=scopes.map(c=>c.club_id);
   if(!ids.length)return {scopes:[],reports:[],photos:[],clubs:[]};
   const [reports,photos,clubs]=await Promise.all([
-   supabase.from('monitoring_reports').select('id,club_id,status,monitoring_date,monitoring_time,updated_at,version').eq('academic_term',TERM).in('club_id',ids),
+   supabase.from('monitoring_reports').select('id,club_id,status,monitoring_date,monitoring_time,updated_at,version,deleted_at').eq('academic_term',TERM).in('club_id',ids),
    supabase.from('monitoring_report_photos').select('report_id,upload_status').eq('upload_status','ready'),
    supabase.from('clubs').select('id,name,category,reservation_group').in('id',ids)
   ]);
@@ -106,13 +107,15 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
  if(body.action==='report-get'){
   const scope=await findScope(body.clubId,group);
   const report=await reportFor(scope);
-  const photos=report?await photosFor(report.id):[];
+  const recoverable=report?.deleted_at?{status:report.deleted_prev_status,deleted_at:report.deleted_at,version:report.version}:null;
+  const active=report&&!report.deleted_at?report:null;
+  const photos=active?await photosFor(active.id):[];
   const pendingPhoto=photos.find(p=>p.upload_status==='pending');
   const resultPhotos=await Promise.all(photos.filter(p=>p.upload_status==='ready').map(async p=>{
    const {data,error}=await supabase.storage.from(BUCKET).createSignedUrl(p.storage_path,600);
    return {...p,preview_url:error?'':data?.signedUrl||''};
   }));
-  return {scope,report,photos:resultPhotos,pendingPhoto:pendingPhoto?{id:pendingPhoto.id,original_filename:pendingPhoto.original_filename,created_at:pendingPhoto.created_at}:null};
+  return {scope,report:active,recoverable,photos:resultPhotos,pendingPhoto:pendingPhoto?{id:pendingPhoto.id,original_filename:pendingPhoto.original_filename,created_at:pendingPhoto.created_at}:null};
  }
  if(body.action==='report-save'){
   const scope=await findScope(body.clubId,group);
@@ -134,13 +137,15 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
    if(!date||!time||!content.monitoring_location.trim()||!content.activity_description.trim()||!content.staff_evaluation.trim()||!content.staff_opinion.trim())
     throw fail(400,'작성 완료하려면 점검일시·장소·활동내용·평가·의견을 입력해 주세요.');
    const currentReport=await reportFor(scope);
-   if(!currentReport)throw fail(400,'사진을 첨부하기 위해 먼저 임시 저장해 주세요.');
+   if(!currentReport||currentReport.deleted_at)throw fail(400,'사진을 첨부하기 위해 먼저 임시 저장해 주세요.');
    const ready=(await photosFor(currentReport.id)).filter(p=>p.upload_status==='ready');
    if(ready.length!==MAX_PHOTOS_PER_REPORT)throw fail(400,'실시한 동아리의 결과 작성 완료에는 사진 1장이 필요합니다.');
   }
   if(status==='not_conducted'&&!content.not_conducted_reason.trim())throw fail(400,'미실시 사유를 입력해 주세요.');
   const old=await reportFor(scope);
+  if(status==='completed'&&old?.status==='completed'&&old.completed_at)content.completed_at=old.completed_at;
   if(old){
+   if(old.deleted_at)throw fail(409,'삭제된 기록입니다. 먼저 복구해 주세요.');
    if(!Number.isInteger(body.version)||body.version!==old.version)throw fail(409,'다른 화면에서 이 기록이 변경되었습니다. 다시 불러온 뒤 확인해 주세요.');
    const {data,error}=await supabase.from('monitoring_reports').update({...content,version:old.version+1})
     .eq('id',old.id).eq('version',old.version).select('*').maybeSingle();
@@ -158,10 +163,37 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   }
   await history(data.id,'create',group,null,data.status);return {report:data};
  }
+ if(body.action==='report-delete'){
+  const scope=await findScope(body.clubId,group);
+  const old=await reportFor(scope);
+  if(!old||old.deleted_at)throw fail(409,'이미 삭제되었거나 기록이 없는 동아리입니다.');
+  if(!Number.isInteger(body.version)||body.version!==old.version)throw fail(409,'다른 화면에서 기록이 수정되었습니다. 다시 확인해 주세요.');
+  const {data,error}=await supabase.from('monitoring_reports')
+   .update({deleted_at:new Date().toISOString(),deleted_by_group:group,deleted_prev_status:old.status,
+    updated_at:new Date().toISOString(),updated_by_group:group,version:old.version+1})
+   .eq('id',old.id).eq('version',old.version).is('deleted_at',null).select('id,version').maybeSingle();
+  if(error||!data)throw fail(409,'삭제를 완료하지 못했습니다. 최신 기록을 확인해 주세요.');
+  await history(old.id,'delete',group,old.status,null);
+  return {deleted:true};
+ }
+ if(body.action==='report-restore'){
+  const scope=await findScope(body.clubId,group);
+  const old=await reportFor(scope);
+  if(!old?.deleted_at)throw fail(409,'복구할 기록이 없습니다.');
+  if(!Number.isInteger(body.version)||body.version!==old.version)throw fail(409,'다른 화면에서 기록이 변경되었습니다.');
+  const {data,error}=await supabase.from('monitoring_reports')
+   .update({deleted_at:null,deleted_by_group:null,deleted_prev_status:null,
+     status:old.deleted_prev_status||'draft',updated_at:new Date().toISOString(),
+     updated_by_group:group,version:old.version+1})
+   .eq('id',old.id).eq('version',old.version).not('deleted_at','is',null).select('*').maybeSingle();
+  if(error||!data)throw fail(409,'복구하지 못했습니다. 다시 조회해 주세요.');
+  await history(old.id,'restore',group,null,data.status);
+  return {report:data};
+ }
  if(body.action==='photo-start'){
   const scope=await findScope(body.clubId,group);
   const report=await reportFor(scope);
-  if(!report)throw fail(400,'사진 첨부 전에 임시 저장을 해 주세요.');
+  if(!report||report.deleted_at)throw fail(400,'사진 첨부 전에 임시 저장을 해 주세요.');
   const filename=field(body.filename,'사진 이름',240);
   const size=Number(body.fileSize);
   const mime=String(body.mime||'').toLowerCase();

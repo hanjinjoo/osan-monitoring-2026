@@ -95,3 +95,12 @@
 
 .report-photo-preview{display:block;width:100%;border:0;background:transparent;padding:0;cursor:zoom-in}
 .report-photo-preview:focus-visible{outline:3px solid #87b7ef;outline-offset:-3px}
+
+/* 2차 개선: 현황 카드는 동작 가능한 필터, 완료 기록은 읽기 모드 */
+button.report-stat{width:100%;font:inherit;text-align:left;cursor:pointer}
+button.report-stat:hover{border-color:#7da4c7;background:#eff6fc}
+button.report-stat.chosen{border:2px solid #255c94;background:#f0f7ff;padding:17px 14px}
+button.report-stat:focus-visible{outline:3px solid #6ea3dc;outline-offset:2px}
+.report-editor-fields{border:0;margin:0;padding:0;min-width:0}
+.report-editor-fields[disabled] .report-form-row .control,.report-editor-fields[disabled] .report-form-grid .control{background:#f6f8fb;color:#42576c;opacity:1}
+.report-buttons .danger{margin-left:auto}
