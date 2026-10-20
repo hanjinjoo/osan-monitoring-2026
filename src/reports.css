@@ -91,3 +91,4 @@
  .report-savebar{align-items:stretch}
  .report-club-main strong{font-size:14px}
 }
+.report-failed-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center}
