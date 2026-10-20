@@ -17,9 +17,9 @@ const CORS:Record<string,string> = {
 const TERM='2026-2';
 const BUCKET='monitoring-report-photos';
 const MAX_FILE=50_000_000; // Free 프로젝트 파일당 최대 50 MB(10진), Storage 전역 설정과 재확인.
-const MAX_PHOTOS=100;
-const TEST_MODE_MAX_REPORT_PHOTOS=6; // 소량 테스트 전용, 본 운영에서 재검토
-const TEST_MODE_MAX_TOTAL_BYTES=80_000_000; // Free 1GB 공간 보존용 약 80 MB 소프트 제한
+const MAX_PHOTOS_PER_REPORT=1;
+const STORAGE_SOFT_LIMIT_BYTES=850_000_000; // Free 1GB, 원본 사진 전체 850MB까지만 안전하게 허용
+// 단일 기록당 1장; 사진 교체 중에는 기존 ready 한 장 + 신규 pending 한 장까지 가능
 const env=(n:string)=>Deno.env.get(n)||'';
 const supabase=createClient(env('SUPABASE_URL'),env('SUPABASE_SERVICE_ROLE_KEY'),{
  auth:{persistSession:false,autoRefreshToken:false}
@@ -107,11 +107,12 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   const scope=await findScope(body.clubId,group);
   const report=await reportFor(scope);
   const photos=report?await photosFor(report.id):[];
+  const pendingPhoto=photos.find(p=>p.upload_status==='pending');
   const resultPhotos=await Promise.all(photos.filter(p=>p.upload_status==='ready').map(async p=>{
    const {data,error}=await supabase.storage.from(BUCKET).createSignedUrl(p.storage_path,600);
    return {...p,preview_url:error?'':data?.signedUrl||''};
   }));
-  return {scope,report,photos:resultPhotos};
+  return {scope,report,photos:resultPhotos,pendingPhoto:pendingPhoto?{id:pendingPhoto.id,original_filename:pendingPhoto.original_filename,created_at:pendingPhoto.created_at}:null};
  }
  if(body.action==='report-save'){
   const scope=await findScope(body.clubId,group);
@@ -129,7 +130,14 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
    status:String(status),updated_by_group:group,updated_at:new Date().toISOString(),
    completed_at:status==='completed'?new Date().toISOString():null
   };
-  if(status==='completed'&&(!date||!time||!content.monitoring_location.trim()||!content.activity_description.trim()||!content.staff_evaluation.trim()||!content.staff_opinion.trim()))throw fail(400,'작성 완료하려면 점검일시·장소·활동내용·평가·의견을 입력해 주세요.');
+  if(status==='completed'){
+   if(!date||!time||!content.monitoring_location.trim()||!content.activity_description.trim()||!content.staff_evaluation.trim()||!content.staff_opinion.trim())
+    throw fail(400,'작성 완료하려면 점검일시·장소·활동내용·평가·의견을 입력해 주세요.');
+   const currentReport=await reportFor(scope);
+   if(!currentReport)throw fail(400,'사진을 첨부하기 위해 먼저 임시 저장해 주세요.');
+   const ready=(await photosFor(currentReport.id)).filter(p=>p.upload_status==='ready');
+   if(ready.length!==MAX_PHOTOS_PER_REPORT)throw fail(400,'실시한 동아리의 결과 작성 완료에는 사진 1장이 필요합니다.');
+  }
   if(status==='not_conducted'&&!content.not_conducted_reason.trim())throw fail(400,'미실시 사유를 입력해 주세요.');
   const old=await reportFor(scope);
   if(old){
@@ -161,19 +169,22 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   if(!ext[mime])throw fail(400,'JPG, PNG, WebP, HEIC, HEIF 사진만 지원합니다.');
   if(!Number.isSafeInteger(size)||size<=0||size>MAX_FILE)throw fail(400,'사진 크기는 파일당 최대 50MB 이내여야 합니다. 실제 프로젝트 한도는 다를 수 있습니다.');
   const photos=await photosFor(report.id);
-  if(photos.length>=MAX_PHOTOS)throw fail(400,'사진은 한 동아리에서 최대 100장까지 첨부할 수 있습니다.');
-  if(photos.length>=TEST_MODE_MAX_REPORT_PHOTOS)throw fail(400,'무료 플랜 테스트 모드에서는 동아리당 최대 6장만 업로드할 수 있습니다. 실제 운영 전 용량 정책을 재설정합니다.');
+  if(photos.filter(p=>p.upload_status==='pending').length)throw fail(409,'이미 진행 중이거나 실패한 업로드가 있습니다. 기존 업로드를 정리한 후 다시 첨부해 주세요.');
+  if(photos.filter(p=>p.upload_status==='ready').length>MAX_PHOTOS_PER_REPORT)throw fail(409,'사진 연결 기록을 확인해야 합니다. 관리자에게 문의해 주세요.');
   const {data:recordSizes,error:sizeError}=await supabase.from('monitoring_report_photos').select('file_size');
   if(sizeError)throw fail(503,'현재 사진 사용량을 확인할 수 없습니다. 업로드를 중단합니다.');
   const totalUsed=(recordSizes||[]).reduce((sum,p)=>sum+Number(p.file_size||0),0);
-  if(totalUsed+size>TEST_MODE_MAX_TOTAL_BYTES)throw fail(413,'무료 플랜 테스트 사진 임시 총량(80MB)에 도달했습니다. 운영 용량을 검토해 주세요.');
+  if(totalUsed+size>STORAGE_SOFT_LIMIT_BYTES)throw fail(413,'무료 저장소의 안전 용량(사진 총 850MB)에 도달했습니다. 기존 파일을 삭제하지 말고 관리자에게 문의해 주세요.');
   const photoId=crypto.randomUUID();
   const path=TERM+'/'+group+'/'+scope.club_id+'/'+photoId+'.'+ext[mime];
   const {data:created,error:createError}=await supabase.from('monitoring_report_photos').insert({
    id:photoId,report_id:report.id,storage_path:path,original_filename:filename,content_type:mime,
    file_size:size,display_order:photos.length,upload_status:'pending'
   }).select('id').single();
-  if(createError||!created)throw fail(500,'사진 업로드 정보를 생성하지 못했습니다.');
+  if(createError||!created){
+   if(createError?.code==='23505')throw fail(409,'다른 화면에서 사진 업로드가 진행 중입니다. 해당 작업을 확인해 주세요.');
+   throw fail(500,'사진 업로드 정보를 생성하지 못했습니다.');
+  }
   const {data:signed,error:signErr}=await supabase.storage.from(BUCKET).createSignedUploadUrl(path);
   if(signErr||!signed){
    await supabase.from('monitoring_report_photos').delete().eq('id',photoId);
@@ -209,10 +220,16 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   if(!item)throw fail(409,'사진이 아직 서버에 업로드되지 않았습니다.');
   const actualSize=Number(item.metadata?.size||0);
   if(!Number.isFinite(actualSize)||actualSize!==photo.file_size)throw fail(409,'사진 용량이 전송 전후 다릅니다. 업로드 결과를 확인해 주세요.');
-  const {data,error:updateError}=await supabase.from('monitoring_report_photos').update({upload_status:'ready'}).eq('id',photo.id).select('*').single();
-  if(updateError)throw fail(500,'사진 업로드 완료를 기록하지 못했습니다.');
+  const {data:swap,error:swapError}=await supabase.rpc('monitoring_finish_single_photo',{p_photo_id:photo.id,p_group:group});
+  if(swapError)throw fail(409,'사진 교체 확정에 실패했습니다. 기존 사진은 유지됩니다. 다시 시도해 주세요.');
+  const previousPath=swap?.replaced_path;
+  if(typeof previousPath==='string'&&previousPath&&previousPath!==path){
+   const {error:cleanupError}=await supabase.storage.from(BUCKET).remove([previousPath]);
+   if(cleanupError)console.error('Prior photo cleanup needed',photo.report_id);
+  }
+  const updated=await queryOne('monitoring_report_photos','id',photo.id);
   const {data:signed}=await supabase.storage.from(BUCKET).createSignedUrl(path,600);
-  return {photo:{...data,preview_url:signed?.signedUrl||''}};
+  return {photo:{...updated,preview_url:signed?.signedUrl||''}};
  }
  if(body.action==='photo-url'){
   const {photo}=await photoBelongs(body.photoId,group);
@@ -222,7 +239,8 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   return {url:data.signedUrl};
  }
  if(body.action==='photo-delete'){
-  const {photo}=await photoBelongs(body.photoId,group);
+  const {photo,report}=await photoBelongs(body.photoId,group);
+  if(report.status==='completed')throw fail(409,'작성 완료 상태의 사진은 삭제할 수 없습니다. 새 사진으로 교체하거나 임시 저장 상태로 변경하세요.');
   const {error:storageError}=await supabase.storage.from(BUCKET).remove([photo.storage_path]);
   if(storageError)throw fail(500,'사진 파일 삭제에 실패했습니다. 기록은 유지됩니다.');
   const {error}=await supabase.from('monitoring_report_photos').delete().eq('id',photo.id);
