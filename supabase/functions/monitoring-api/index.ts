@@ -23,6 +23,13 @@ const isGroup=(x:unknown):x is 'integrated'|'startup'=>x==='integrated'||x==='st
 const isDate=(x:unknown):x is string=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(`${x}T12:00:00+09:00`));
 const isTime=(x:unknown):x is string=>typeof x==='string'&&/^\d{2}:\d{2}$/.test(x);
 const isUuid=(x:unknown)=>typeof x==='string'&&/^[a-f0-9-]{36}$/i.test(x);
+const cleanLocation=(x:unknown,required:boolean)=>{
+ if(typeof x!=='string'){if(!required&&(x===null||x===undefined))return null;throw Error('모니터링 진행 장소를 입력해 주세요.');}
+ const location=x.trim();
+ if(location.length>120)throw Error('모니터링 진행 장소는 120자 이내로 입력해 주세요.');
+ if(required&&!location)throw Error('모니터링 진행 장소를 입력해 주세요.');
+ return location||null;
+};
 
 function bytesToB64Url(bytes:Uint8Array){return btoa(Array.from(bytes,x=>String.fromCharCode(x)).join('')).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
 function b64UrlToBytes(value:string){const fixed=value.replace(/-/g,'+').replace(/_/g,'/');const raw=atob(fixed+'='.repeat((4-fixed.length%4)%4));return Uint8Array.from(raw,c=>c.charCodeAt(0));}
@@ -80,7 +87,7 @@ Deno.serve(async(req:Request)=>{
    if(!isGroup(body.group))return json('예약 그룹을 선택해 주세요.',400);
    let isAdmin=false;
    if(body.token){const staffGroup=await checkToken(body.token);if(staffGroup!==body.group)return json('담당자 인증이 만료되었거나 권한이 없습니다.',401);isAdmin=true;}
-   let q=supabase.from('reservations').select('id,club_id,reservation_group,reservation_date,reservation_time,status,created_at,updated_at').eq('reservation_group',body.group).order('reservation_date').order('reservation_time');
+   let q=supabase.from('reservations').select('id,club_id,reservation_group,reservation_date,reservation_time,reservation_location,status,created_at,updated_at').eq('reservation_group',body.group).order('reservation_date').order('reservation_time');
    if(!isAdmin)q=q.eq('status','confirmed');
    const [res,blocks]=await Promise.all([q,supabase.from('blocked_slots').select('id,reservation_group,blocked_date,blocked_time').eq('reservation_group',body.group).order('blocked_date').order('blocked_time')]);
    if(res.error||blocks.error)throw Error(res.error?.message||blocks.error?.message);
@@ -89,7 +96,8 @@ Deno.serve(async(req:Request)=>{
   if(action==='create'){
    if(typeof body.clubId!=='string'||body.clubId.length>60)return json('동아리를 선택해 주세요.',400);
    requireSlot(body.date,body.time);
-   return json(await rpc('monitoring_create_booking',{p_club_id:body.clubId,p_date:body.date,p_time:body.time,p_weekends:weekendEnabled}));
+   const location=cleanLocation(body.location,true);
+    return json(await rpc('monitoring_create_booking_with_location',{p_club_id:body.clubId,p_date:body.date,p_time:body.time,p_weekends:weekendEnabled,p_location:location}));
   }
   if(action==='login'){
    if(!(await loginAllowed(req)))return json('로그인 시도 횟수가 많습니다. 10분 후 다시 시도해 주세요.',429);
@@ -101,15 +109,21 @@ Deno.serve(async(req:Request)=>{
    if(!group)return json('등록되지 않은 담당자 번호입니다.',401);
    return json({group,token:await makeToken(group)});
   }
-  if(['update','cancel','block','block-day','unblock'].includes(action)){
+  if(['update','update-location','cancel','block','block-day','unblock'].includes(action)){
    const staffGroup=await checkToken(body.token);
    if(!staffGroup)return json('관리자 인증이 만료되었거나 권한이 없습니다.',401);
    if(action==='update'){
     if(!isUuid(body.reservationId))return json('예약 ID가 유효하지 않습니다.',400);
     requireSlot(body.date,body.time);
-    return json(await rpc('monitoring_update_booking',{p_id:body.reservationId,p_group:staffGroup,p_date:body.date,p_time:body.time,p_weekends:weekendEnabled}));
+    const location=cleanLocation(body.location,false);
+     return json(await rpc('monitoring_update_booking_with_location',{p_id:body.reservationId,p_group:staffGroup,p_date:body.date,p_time:body.time,p_weekends:weekendEnabled,p_location:location}));
    }
-   if(action==='cancel'){
+   if(action==='update-location'){
+     if(!isUuid(body.reservationId))return json('예약 ID가 유효하지 않습니다.',400);
+     const location=cleanLocation(body.location,false);
+     return json(await rpc('monitoring_update_booking_location',{p_id:body.reservationId,p_group:staffGroup,p_location:location}));
+    }
+    if(action==='cancel'){
     if(!isUuid(body.reservationId))return json('예약 ID가 유효하지 않습니다.',400);
     return json(await rpc('monitoring_cancel_booking',{p_id:body.reservationId,p_group:staffGroup}));
    }
