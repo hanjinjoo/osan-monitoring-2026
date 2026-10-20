@@ -8,7 +8,7 @@ let root, config, group, token, onBack, bookings, view, sessionId=0;
 const tabs={integrated:['major','employment','general'],startup:['startup']};
 const statusLabel={missing:'미작성',draft:'작성 중',completed:'작성 완료',not_conducted:'미실시'};
 const fmtBytes=n=>n>=1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.max(1,Math.ceil(n/1024))+' KB';
-const selfState=()=>({page:'list',items:[],filter:'all',category:'all',search:'',selected:null,photos:[],pendingPhoto:null,report:null,draft:null,dirty:false,saving:false,revision:0,photoUploads:[],message:'',error:'',loading:true});
+const selfState=()=>({page:'list',items:[],filter:'all',category:'all',search:'',selected:null,photos:[],pendingPhoto:null,recoverable:null,editMode:false,report:null,draft:null,dirty:false,saving:false,revision:0,photoUploads:[],message:'',error:'',loading:true});
 let state=selfState(), autosaveTimer=null, activeUploads=new Set();
 function uploadSignedPhoto(url,file,record){
  // Supabase SDK uploadToSignedUrl matches PUT multipart FormData; original bytes preserved.
@@ -86,7 +86,7 @@ function listHtml(){
   '<div class="report-stats">'+[
    ['전체 대상',state.items.length,'total'],['미작성',counts.missing,'missing'],['작성 중',counts.draft,'draft'],
    ['작성 완료',counts.completed,'completed'],['미실시',counts.not_conducted,'not_conducted']
-  ].map(([title,num,cls])=>'<div class="report-stat '+cls+'"><span>'+title+'</span><strong>'+num+'</strong></div>').join('')+'</div>'+
+  ].map(([title,num,cls])=>'<button type="button" data-r-action="stat-filter" data-value="'+(cls==='total'?'all':cls)+'" aria-pressed="'+(state.filter===(cls==='total'?'all':cls))+'" class="report-stat '+cls+' '+(state.filter===(cls==='total'?'all':cls)?'chosen':'')+'"><span>'+title+'</span><strong>'+num+'</strong></button>').join('')+'</div>'+
   '<div class="report-filters"><div class="report-category">'+options.map(([val,title])=>'<button class="report-tab '+(state.category===val?'on':'')+
   '" type="button" data-r-action="category" data-value="'+esc(val)+'">'+esc(title)+'</button>').join('')+'</div>'+
   '<div class="report-search-row"><label class="report-input-wrap">동아리명·학과 검색<input class="control" type="search" id="report-search" value="'+esc(state.search)+'" placeholder="동아리명 또는 학과 입력"></label>'+
@@ -111,7 +111,7 @@ function photoHtml(){
   '<button type="button" class="report-photo-preview" data-r-action="view-photo" data-id="'+esc(p.id)+'" aria-label="고화질 사진 크게 보기">'+
   (p.preview_url?'<img loading="lazy" src="'+esc(p.preview_url)+'" alt="첨부된 활동 사진" />':'<span class="report-photo-fallback">🖼 사진</span>')+'</button>'+
   '<div class="report-photo-foot"><span title="'+esc(p.original_filename)+'">'+esc(p.original_filename)+'</span>'+
-  (state.draft?.status==='completed'?'':'<button class="report-trash" type="button" data-r-action="delete-photo" data-id="'+esc(p.id)+'" aria-label="사진 삭제">×</button>')+'</div></div>').join('');
+  (state.draft?.status==='completed'&&!state.editMode?'':'<button class="report-trash" type="button" data-r-action="delete-photo" data-id="'+esc(p.id)+'" aria-label="사진 삭제">×</button>')+'</div></div>').join('');
  const uploading=state.photoUploads.map(f=>'<div class="report-photo-tile report-photo-uploading"><div class="report-upload-symbol">↑</div>'+
   '<strong>'+esc(f.filename)+'</strong><progress value="'+f.percent+'" max="100"></progress>'+
   '<small>'+esc(f.status)+(f.percent>0?' · '+f.percent+'%':'')+'</small>'+
@@ -130,24 +130,30 @@ function editorHtml(){
  const x=selectedScope(),d=state.draft||draftFields(null);
  if(!x)return baseShell('<div class="panel report-panel">동아리를 선택해 주세요.</div>');
  const completed=state.saving?'저장 중…':state.dirty?'저장하지 않은 변경사항 있음':'서버 저장 완료';
+  const locked=state.report?.status==='completed'&&!state.editMode;
+  if(state.recoverable)return baseShell('<main class="panel report-panel"><button type="button" class="report-return" data-r-action="list">← 동아리 목록</button><h2>'+esc(x.name)+'</h2><p>삭제된 기록입니다. 작성 내용과 사진은 복구할 수 있습니다.</p><button type="button" class="button primary" data-r-action="restore-report">삭제 기록 복구</button>'+banner(state.error,true)+'</main>');
  const needReason=d.status==='not_conducted';
  return baseShell('<main class="panel report-panel"><button type="button" class="report-return" data-r-action="list">← 전체 동아리 목록</button>'+
   '<div class="report-section-head"><div><span class="tag">'+esc(labelOf(x))+'</span><h2>'+esc(x.name)+'</h2>'+
   '<p>'+esc(x.department||'학과 정보 없음')+(x.professor_name?' · 지도교수 '+esc(x.professor_name):'')+
   (x.student_representative?' · 대표학생 '+esc(x.student_representative):'')+'</p></div>'+
   '<span class="report-status '+esc(d.status)+'">'+esc(statusLabel[d.status])+'</span></div>'+
-  '<div class="report-form-grid"><label>실제 점검 날짜<input type="date" class="control" data-report-field="monitoring_date" value="'+esc(d.monitoring_date)+'"></label>'+
+  '<fieldset class="report-editor-fields" '+(locked?'disabled':'')+'><div class="report-form-grid"><label>실제 점검 날짜<input type="date" class="control" data-report-field="monitoring_date" value="'+esc(d.monitoring_date)+'"></label>'+
   '<label>실제 점검 시간<input type="time" class="control" data-report-field="monitoring_time" value="'+esc(d.monitoring_time)+'"></label></div>'+
   '<label class="report-form-row">점검장소<input class="control" data-report-field="monitoring_location" maxlength="1000" placeholder="방문 장소를 입력해 주세요" value="'+esc(d.monitoring_location)+'"></label>'+
   '<label class="report-form-row">활동내용<textarea class="control" data-report-field="activity_description" maxlength="20000" rows="5" placeholder="현장에서 확인한 실제 활동 내용을 작성해 주세요.">'+esc(d.activity_description)+'</textarea></label>'+
   '<label class="report-form-row">담당자평가<textarea class="control" data-report-field="staff_evaluation" maxlength="20000" rows="4" placeholder="운영 현황과 점검 결과를 작성해 주세요.">'+esc(d.staff_evaluation)+'</textarea></label>'+
   '<label class="report-form-row">담당자의견<textarea class="control" data-report-field="staff_opinion" maxlength="20000" rows="4" placeholder="개선 필요사항이나 특이사항을 작성해 주세요.">'+esc(d.staff_opinion)+'</textarea></label>'+
   '<label class="report-form-row">미실시 사유 <small>(미실시 처리할 때 작성)</small><textarea class="control" data-report-field="not_conducted_reason" maxlength="3000" rows="2" placeholder="방문하지 못한 사유를 작성해 주세요.">'+esc(d.not_conducted_reason)+'</textarea></label>'+
-  '<div id="report-photo-section" class="report-photo-section">'+photoHtml()+'</div>'+
+  '<div id="report-photo-section" class="report-photo-section">'+photoHtml()+'</div></fieldset>'+
   '<div class="report-savebar"><div><strong id="report-save-state">'+esc(completed)+'</strong><small id="report-saved-time">'+(state.report?.updated_at?'최종 저장 '+esc(new Date(state.report.updated_at).toLocaleString('ko-KR')):'저장된 기록 없음')+'</small></div>'+
-  '<div class="report-buttons"><button type="button" class="button" data-r-action="save-draft" '+(state.saving?'disabled':'')+'>임시 저장</button>'+
-  '<button type="button" class="button primary" data-r-action="complete" '+(state.saving?'disabled':'')+'>작성 완료</button>'+
-  '<button type="button" class="button danger" data-r-action="not-conducted" '+(state.saving?'disabled':'')+'>미실시 처리</button></div></div>'+
+  '<div class="report-buttons">'+(locked?
+   '<button type="button" class="button primary" data-r-action="edit-report">수정하기</button>':
+   state.editMode?'<button type="button" class="button" data-r-action="cancel-edit">수정 취소</button><button type="button" class="button primary" data-r-action="save-edit">수정사항 저장</button>':
+   '<button type="button" class="button" data-r-action="save-draft">임시 저장</button>'+
+   '<button type="button" class="button primary" data-r-action="complete">작성 완료</button>'+
+   '<button type="button" class="button danger" data-r-action="not-conducted">미실시 처리</button>')+
+   (state.report?'<button type="button" class="button danger" data-r-action="delete-report">결과 기록 삭제</button>':'')+'</div></div>'+
   banner(state.message)+banner(state.error,true)+'</main>');
 }
 function render(){
@@ -179,20 +185,21 @@ async function loadList(){
  const byReport=new Map(data.reports.map(r=>[r.club_id,r]));
  state.items=data.scopes.map(x=>{
   const c=byClub.get(x.club_id)||{},r=byReport.get(x.club_id);
-  return {...x,...c, status:r?.status||'missing',monitoring_date:r?.monitoring_date||'',
+  return {...x,...c, status:r&&!r.deleted_at?r.status:'missing',recoverable:!!r?.deleted_at,monitoring_date:r&&!r.deleted_at?r.monitoring_date||'':'',
    photoCount:data.photoCounts?.[r?.id]||0,updated_at:r?.updated_at||null};
  });
  state.items.sort((a,b)=>(a.category||'').localeCompare(b.category||'')||a.name.localeCompare(b.name,'ko'));
 }
 async function open(clubId){
- if(state.dirty&&!(await save('draft')))return;
+ if(state.dirty&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
+  if(state.dirty&&!(await save('draft')))return;
  const current=++sessionId;
  state.page='editor';state.selected=clubId;state.loading=true;state.message='';state.error='';state.photoUploads=[];render();
  try{
   const data=await api('report-get',{clubId});
   if(current!==sessionId)return;
   const x=selectedScope(),defaults=dateTimeFor(x);
-  state.report=data.report;state.photos=data.photos;state.pendingPhoto=data.pendingPhoto||null;
+  state.report=data.report;state.photos=data.photos;state.pendingPhoto=data.pendingPhoto||null;state.recoverable=data.recoverable||null;state.editMode=false;
   state.draft={...draftFields(data.report),
    monitoring_date:data.report?.monitoring_date||defaults.date,
    monitoring_time:(data.report?.monitoring_time||defaults.time||'').slice(0,5)};
@@ -210,10 +217,10 @@ function collect(){
 }
 function markDirty(){
  state.revision++;state.dirty=true;state.message='';state.error='';
- if(state.draft.status==='completed')state.draft.status='draft';
+ // 작성 완료 결과 수정은 완료 상태를 유지한다.
  saveIndicator();
  clearTimeout(autosaveTimer);
- autosaveTimer=setTimeout(()=>{if(state.page==='editor'&&state.dirty)save('draft')},1800);
+ if(!state.editMode)autosaveTimer=setTimeout(()=>{if(state.page==='editor'&&state.dirty)save('draft')},1800);
 }
 async function save(status){
  if(state.page!=='editor')return false;
@@ -254,7 +261,7 @@ async function save(status){
   if(status==='completed'||status==='not_conducted'||status==='draft'){
    setMessage(effective==='completed'?'결과 기록을 작성 완료했습니다.':effective==='not_conducted'?'미실시로 저장했습니다.':'임시 저장했습니다.');
   }
-  if(state.dirty&&state.page==='editor'){
+  if(state.dirty&&state.page==='editor'&&!state.editMode){
    clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>save('draft'),350);
   }
   return true;
@@ -264,14 +271,16 @@ async function showList(){
  clearTimeout(autosaveTimer);
  if(state.photoUploads.some(p=>p.error)&&!window.confirm('업로드 실패한 사진이 있습니다. 목록을 나가면 재시도 대상이 사라집니다. 이동하시겠습니까?'))return;
  if(activeUploads.size){setMessage('사진 업로드 중입니다. 완료될 때까지 기다려 주세요.',true);return}
- if(state.dirty&&!(await save('draft')))return;
+ if(state.dirty&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
+  if(state.dirty&&!(await save('draft')))return;
  sessionId++;state.page='list';state.selected=null;state.loading=true;render();
  try{await loadList();state.loading=false;state.message='';state.error='';render()}catch(e){state.loading=false;state.error=e.message;render()}
 }
 async function leave(){
  if(state.photoUploads.some(p=>p.error)&&!window.confirm('업로드 실패한 사진이 있습니다. 이 화면을 나가시겠습니까?'))return;
  if(activeUploads.size){setMessage('사진 업로드를 완료한 후 이동해 주세요.',true);return}
- if(state.page==='editor'&&state.dirty&&!(await save('draft')))return;
+ if(state.page==='editor'&&state.dirty&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
+  if(state.page==='editor'&&state.dirty&&!(await save('draft')))return;
  clearTimeout(autosaveTimer);sessionId++;root=null;onBack();
 }
 async function imageUpload(file,existing=null){
@@ -283,7 +292,7 @@ async function imageUpload(file,existing=null){
  if(!fileTypes.includes(mime)){setMessage('지원하지 않는 이미지 형식입니다: '+file.name,true);return}
  if(file.size<=0||file.size>MAX_PHOTO){setMessage('파일당 50MB 이내 이미지여야 합니다: '+file.name,true);return}
  if(state.pendingPhoto&&!existing){setMessage('이전의 미완료 사진을 먼저 정리해 주세요.',true);return}
- if(state.dirty||!state.report){if(!await save('draft'))return}
+ if(state.dirty||!state.report){if(!await save(state.editMode?'completed':'draft'))return}
  const record=existing||{id:crypto.randomUUID(),file,filename:file.name,percent:0,status:'업로드 준비 중',error:false};
  record.error=false;record.status='업로드 준비 중';record.percent=0;
  if(!existing)state.photoUploads.push(record);
@@ -326,6 +335,22 @@ async function bind(){
   if(action==='back'){await leave();return}
   if(action==='list'){await showList();return}
   if(action==='reload'){await reload();return}
+   if(action==='stat-filter'){state.filter=value;state.category='all';state.search='';render();return}
+   if(action==='edit-report'){state.editMode=true;render();return}
+   if(action==='cancel-edit'){state.dirty=false;await open(state.selected);return}
+   if(action==='save-edit'){if(await save('completed'))await open(state.selected);return}
+   if(action==='delete-report'){
+    const x=selectedScope();if(!state.report)return;
+    if(!window.confirm(x.name+'의 모니터링 결과 기록을 삭제할까요?\n기존 예약은 유지되고 결과 기록과 사진은 복구할 수 있습니다.'))return;
+    try{await api('report-delete',{clubId:state.selected,version:state.report.version});state.dirty=false;state.editMode=false;await showList();state.message='삭제된 기록은 해당 동아리를 다시 열면 복구할 수 있습니다.';render()}
+    catch(e){setMessage(e.message,true)}
+    return;
+   }
+   if(action==='restore-report'){
+    try{await api('report-restore',{clubId:state.selected,version:state.recoverable.version});await open(state.selected)}
+    catch(e){setMessage(e.message,true)}
+    return;
+   }
   if(action==='category'){state.category=value;render();return}
   if(action==='open'){await open(id);return}
   if(action==='save-draft'){await save('draft');return}
