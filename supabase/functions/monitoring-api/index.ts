@@ -31,6 +31,13 @@ async function secretKey(){
  if(secret.length<32)throw Error('관리자 세션 비밀키가 설정되지 않았습니다.');
  return await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
 }
+async function loginAllowed(req:Request){
+ // 로그인 횟수 제한. 원본 IP나 사번을 테이블에 기록하지 않음.
+ const forwarded=(req.headers.get('cf-connecting-ip')||req.headers.get('x-forwarded-for')?.split(',')[0]||'unknown').trim().slice(0,120);
+ const signature=await crypto.subtle.sign('HMAC',await secretKey(),new TextEncoder().encode('monitoring-login:'+forwarded));
+ const hash=Array.from(new Uint8Array(signature),x=>x.toString(16).padStart(2,'0')).join('');
+ return await rpc('monitoring_staff_login_rate_limit',{p_client_hash:hash})===true;
+}
 async function makeToken(group:'integrated'|'startup'){
  const payload=bytesToB64Url(new TextEncoder().encode(JSON.stringify({group,exp:Math.floor(Date.now()/1000)+60*60*2})));
  const sign=await crypto.subtle.sign('HMAC',await secretKey(),new TextEncoder().encode(payload));
@@ -85,6 +92,7 @@ Deno.serve(async(req:Request)=>{
    return json(await rpc('monitoring_create_booking',{p_club_id:body.clubId,p_date:body.date,p_time:body.time,p_weekends:weekendEnabled}));
   }
   if(action==='login'){
+   if(!(await loginAllowed(req)))return json('로그인 시도 횟수가 많습니다. 10분 후 다시 시도해 주세요.',429);
    const code=String(body.code||'').trim();if(!/^\d{1,20}$/.test(code))return json('등록되지 않은 담당자 번호입니다.',401);
    const integrated=env('MONITORING_INTEGRATED_STAFF_CODE'),startup=env('MONITORING_STARTUP_STAFF_CODE');
    if(!integrated||!startup)return json('담당자 번호가 아직 운영 서버에 설정되지 않았습니다.',503);
