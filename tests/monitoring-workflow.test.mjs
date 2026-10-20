@@ -67,3 +67,12 @@ test('공개 예약조회는 다른 동아리 진행장소를 노출하지 않�
  assert.match(api,/const adminFields='id,club_id,reservation_group,reservation_date,reservation_time,reservation_location,status,created_at,updated_at'/);
  assert.match(api,/select\(isAdmin\?adminFields:publicFields\)/);
 });
+
+test('일반 달력 예약 상세는 서버에서 확정 예약의 장소를 받아 표시한다',()=>{
+ const apiProjection=/const publicFields='([^']+)'/.exec(api)?.[1];
+ assert.ok(apiProjection,'Public calendar state projection exists');
+ assert.ok(apiProjection.split(',').includes('reservation_location'),'Public calendar must receive visit location');
+ assert.match(api,/if\(!isAdmin\)q=q\.eq\('status','confirmed'\)/);
+ assert.match(main,/r\.reservation_location\|\|"장소 미입력"/);
+ assert.match(main,/if\(action==='show-booking'\)/);
+});
