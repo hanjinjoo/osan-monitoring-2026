@@ -75,5 +75,5 @@ test('일반 달력 예약 상세는 서버에서 확정 예약의 장소를 받
  assert.ok(apiProjection.split(',').includes('reservation_location'),'Public calendar must receive visit location');
  assert.match(api,/if\(!isAdmin\)q=q\.eq\('status','confirmed'\)/);
  assert.match(main,/r\.reservation_location\|\|"장소 미입력"/);
- assert.match(main,/if\(action==='show-booking'\)/);
+ assert.match(main,/if\(action==='detail'\)\{app\.modal=\{type:'detail',id\};render\(\);return\}/);
 });
