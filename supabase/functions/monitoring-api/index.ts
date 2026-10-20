@@ -88,7 +88,9 @@ Deno.serve(async(req:Request)=>{
    let isAdmin=false;
    if(body.token){const staffGroup=await checkToken(body.token);if(staffGroup!==body.group)return json('담당자 인증이 만료되었거나 권한이 없습니다.',401);isAdmin=true;}
    // Student calendar only requires booked slots; do not disclose other clubs' exact visit places.
-   const publicFields='id,club_id,reservation_group,reservation_date,reservation_time,status,created_at,updated_at';
+   // Public calendar explicitly displays the visit location for CONFIRMED bookings only.
+   // The existing status='confirmed' filter below excludes cancelled reservations.
+   const publicFields='id,club_id,reservation_group,reservation_date,reservation_time,reservation_location,status,created_at,updated_at';
    const adminFields='id,club_id,reservation_group,reservation_date,reservation_time,reservation_location,status,created_at,updated_at';
    let q=supabase.from('reservations').select(isAdmin?adminFields:publicFields).eq('reservation_group',body.group).order('reservation_date').order('reservation_time');
    if(!isAdmin)q=q.eq('status','confirmed');
