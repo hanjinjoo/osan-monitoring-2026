@@ -262,7 +262,8 @@ async function imageUpload(file,existing=null){
    ?await api('photo-retry',{photoId:record.photoId})
    :await api('photo-start',{clubId:state.selected,filename:file.name,fileSize:file.size,mime});
   record.photoId=signed.photoId;
-  record.status='고화질 사진 전송 중';photoSectionUpdate();
+  record.status=signed.alreadyUploaded?'사진 전송 완료 · 저장 확인 중':'고화질 사진 전송 중';photoSectionUpdate();
+  if(!signed.alreadyUploaded){
   // 브라우저 ESM 로드. tus-js-client는 Supabase 권장 resumable upload 방식.
   const tus=await import('https://esm.sh/tus-js-client@4.3.1');
   await new Promise((resolve,reject)=>{
@@ -282,6 +283,7 @@ async function imageUpload(file,existing=null){
     upload.start();
    }).catch(reject);
   });
+  }
   const done=await api('photo-finish',{photoId:signed.photoId});
   state.photos=[done.photo];state.pendingPhoto=null;
   state.photoUploads=state.photoUploads.filter(p=>p.id!==record.id);
