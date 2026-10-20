@@ -61,3 +61,9 @@ test('창업 관리자 로그인 직후 창업 예약 그룹을 먼저 선택하
  assert.match(main,/app\.adminGroup=result\.group;app\.token=result\.token;app\.route='admin';/);
  assert.match(main,/const group=\(\)=>app\.route==='home'\?CATEGORIES\[app\.category\]\.group/);
 });
+
+test('공개 예약조회는 다른 동아리 진행장소를 노출하지 않고 관리자에게만 전달',()=>{
+ assert.match(api,/const publicFields='id,club_id,reservation_group,reservation_date,reservation_time,status,created_at,updated_at'/);
+ assert.match(api,/const adminFields='id,club_id,reservation_group,reservation_date,reservation_time,reservation_location,status,created_at,updated_at'/);
+ assert.match(api,/select\(isAdmin\?adminFields:publicFields\)/);
+});

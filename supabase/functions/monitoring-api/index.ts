@@ -87,7 +87,10 @@ Deno.serve(async(req:Request)=>{
    if(!isGroup(body.group))return json('예약 그룹을 선택해 주세요.',400);
    let isAdmin=false;
    if(body.token){const staffGroup=await checkToken(body.token);if(staffGroup!==body.group)return json('담당자 인증이 만료되었거나 권한이 없습니다.',401);isAdmin=true;}
-   let q=supabase.from('reservations').select('id,club_id,reservation_group,reservation_date,reservation_time,reservation_location,status,created_at,updated_at').eq('reservation_group',body.group).order('reservation_date').order('reservation_time');
+   // Student calendar only requires booked slots; do not disclose other clubs' exact visit places.
+   const publicFields='id,club_id,reservation_group,reservation_date,reservation_time,status,created_at,updated_at';
+   const adminFields='id,club_id,reservation_group,reservation_date,reservation_time,reservation_location,status,created_at,updated_at';
+   let q=supabase.from('reservations').select(isAdmin?adminFields:publicFields).eq('reservation_group',body.group).order('reservation_date').order('reservation_time');
    if(!isAdmin)q=q.eq('status','confirmed');
    const [res,blocks]=await Promise.all([q,supabase.from('blocked_slots').select('id,reservation_group,blocked_date,blocked_time').eq('reservation_group',body.group).order('blocked_date').order('blocked_time')]);
    if(res.error||blocks.error)throw Error(res.error?.message||blocks.error?.message);
