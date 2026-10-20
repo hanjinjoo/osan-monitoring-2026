@@ -188,7 +188,7 @@ async function loadList(){
  state.items=data.scopes.map(x=>{
   const c=byClub.get(x.club_id)||{},r=byReport.get(x.club_id);
   return {...x,...c, status:r&&!r.deleted_at?r.status:'missing',recoverable:!!r?.deleted_at,monitoring_date:r&&!r.deleted_at?r.monitoring_date||'':'',
-   photoCount:data.photoCounts?.[r?.id]||0,updated_at:r?.updated_at||null};
+   photoCount:r&&!r.deleted_at?(data.photoCounts?.[r.id]||0):0,updated_at:r?.updated_at||null};
  });
  state.items.sort((a,b)=>(a.category||'').localeCompare(b.category||'')||a.name.localeCompare(b.name,'ko'));
 }
