@@ -98,7 +98,7 @@ test('한 동아리 증빙사진은 정확히 1장, 새 사진 실패 시 기존
 
 test('담당자 로그인 횟수 제한은 사번을 DB에 저장하지 않고 검증한다',()=>{
  assert.match(rateSql,/monitoring_staff_login_rate_limit/);
- assert.match(rateSql,/attempts<=20/);
+ assert.match(rateSql,/RETURN n<=20/);
  assert.match(rateSql,/client_hash text PRIMARY KEY/);
  assert.match(rateSql,/REVOKE ALL ON FUNCTION public\.monitoring_staff_login_rate_limit/);
  assert.match(loginApi,/if\(!\(await loginAllowed\(req\)\)\)/);
