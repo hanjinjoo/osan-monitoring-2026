@@ -1,0 +1,32 @@
+name: Monitoring report checks
+on:
+  pull_request:
+    paths:
+      - 'src/reports.js'
+      - 'src/main.js'
+      - 'supabase/functions/monitoring-reports/**'
+      - 'supabase/migrations/20261020000*.sql'
+      - 'tests/monitoring-reports.test.mjs'
+      - '.github/workflows/monitoring-report-checks.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-and-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check src/main.js
+          node --check src/reports.js
+      - name: Regression and report tests
+        run: npm test
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Edge Function type check
+        run: deno check supabase/functions/monitoring-reports/index.ts
