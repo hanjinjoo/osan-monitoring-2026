@@ -34,7 +34,7 @@ function elementToast(){return `<div class="toast-area" role="status" aria-live=
 
 function head(){return `<header class="top-head">
  <div class="brand-row"><span class="brand-icon" aria-hidden="true">▦</span><div class="brand-text"><small>OSAN UNIVERSITY · 2026-2</small><h1>모니터링 일정 선택</h1></div></div>
- ${app.adminGroup?`<button class="button" data-action="logout">← 예약 화면으로</button>`:`<button class="button dark" data-action="login">🔒 일정 변경</button>`}
+ ${app.adminGroup?`<button class="button" data-action="logout">← 예약 화면으로</button>`:`<button class="button dark" data-action="login">🔒 관리자 모드</button>`}
  </header>`}
 function banners(){return `<section class="notice"><span class="notice-icon" aria-hidden="true">📅</span><div><strong>모니터링 기간 : 2026. 10. 26.(월) ~ 11. 27.(금)</strong><p>동아리를 선택하고 달력에서 날짜를 누른 뒤, 방문 시간을 예약해 주세요. 09:00~18:00 · 15분 간격 · 12:00~13:00 제외</p></div></section>
  ${cfg.DEMO_MODE?`<div class="banner-demo">⚠ <div><strong>데모 모드 · 실제 예약 서버 미연결</strong> — 예약 내용은 이 브라우저에만 저장됩니다. 다른 기기와 공유되지 않으며 실제 운영에는 사용할 수 없습니다.</div></div>`:''}
@@ -98,7 +98,7 @@ function actions(yes,action,kind='primary'){return `<div class="modal-actions"><
 function modalHtml(){
  const m=app.modal;if(!m)return '';
  const club=clubById(m.clubId);
- if(m.type==='login')return modalWrap('담당자 인증',`<p>일정 변경 및 취소는 담당자만 가능합니다. 등록된 담당자 사번을 입력해 주세요.</p><div class="field"><label for="staff-code">담당자 사번</label><input id="staff-code" class="control" type="password" inputmode="numeric" autocomplete="off" placeholder="사번을 입력하세요"></div>${cfg.DEMO_MODE?'<div class="field-help">데모 체험 번호: 통합 900001 / 창업 900002 (실제 사번 아님)</div>':''}${actions('인증하기','confirm-login')}`);
+ if(m.type==='login')return modalWrap('관리자 모드 로그인',`<p>예약·일정 관리와 모니터링 결과 관리는 담당자만 이용할 수 있습니다. 등록된 담당자 사번을 입력해 주세요.</p><div class="field"><label for="staff-code">담당자 사번</label><input id="staff-code" class="control" type="password" inputmode="numeric" autocomplete="off" placeholder="사번을 입력하세요"></div>${cfg.DEMO_MODE?'<div class="field-help">데모 체험 번호: 통합 900001 / 창업 900002 (실제 사번 아님)</div>':''}${actions('인증하기','confirm-login')}`);
  if(m.type==='booking')return modalWrap('모니터링 일정 예약',`<dl class="summary-box"><div class="summary-row"><dt>동아리 유형</dt><dd>${esc(CATEGORIES[club?.category||app.category].name)}</dd></div><div class="summary-row"><dt>동아리명</dt><dd>${esc(club?.name)}</dd></div><div class="summary-row"><dt>방문 날짜</dt><dd>${esc(dateLabel(m.date))}</dd></div></dl><div class="field"><label for="booking-time">방문 시간</label><select id="booking-time" class="control">${timeOpts(m.date,m.time,club?.reservation_group)}</select><div class="field-help">09:00~17:45 · 15분 간격 · 12:00~13:00 제외</div></div>${actions('예약 신청','booking-confirm')}`);
  if(m.type==='confirm')return modalWrap('예약 내용 최종 확인',`<p>아래 일정으로 예약하시겠습니까?</p><dl class="summary-box"><div class="summary-row"><dt>동아리명</dt><dd>${esc(club?.name)}</dd></div><div class="summary-row"><dt>방문 날짜</dt><dd>${esc(dateLabel(m.date))}</dd></div><div class="summary-row"><dt>방문 시간</dt><dd>${esc(m.time)}</dd></div></dl><p>예약 완료 후 일정 변경 및 취소는 담당자를 통해서만 가능합니다.</p><div class="modal-actions"><button class="button" data-action="back-booking">돌아가기</button><button class="button primary" data-action="commit-booking" ${app.busy?'disabled':''}>${app.busy?'처리 중…':'예약 확정'}</button></div>`);
  if(m.type==='detail'){
