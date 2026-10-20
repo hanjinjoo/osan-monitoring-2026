@@ -48,13 +48,13 @@ test('기존 예약 함수·차단 경로를 변경하지 않고 결과관리만
  assert.match(original,/app\.reportMode/);
  assert.match(index,/src\/reports\.css/);
 });
-test('카메라와 갤러리 입력은 분리, 고화질 TUS 업로드 사용',()=>{
+test('카메라와 갤러리 입력은 분리, 고화질 서명 URL 직접 업로드 사용',()=>{
  assert.match(frontend,/capture="environment"/);
  assert.match(frontend,/id="report-gallery-input"/);
  assert.doesNotMatch(frontend,/id="report-gallery-input"[^>]*multiple/);
- assert.match(frontend,/tus-js-client/);
- assert.match(frontend,/x-signature/);
- assert.match(frontend,/onProgress/);
+ assert.match(frontend,/uploadSignedPhoto\(signed\.uploadUrl,file,record\)/);
+ assert.match(frontend,/xhr\.open\('PUT',url,true\)/);
+ assert.match(frontend,/xhr\.upload\.onprogress/);
  assert.match(frontend,/photo-finish/);
  assert.match(frontend,/retry-photo/);
 });
@@ -107,13 +107,17 @@ test('담당자 로그인 횟수 제한은 사번을 DB에 저장하지 않고 �
  assert.match(loginApi,/if\(action==='state'\)/);
 });
 
-test('iPhone/Android용 tus 브라우저 번들만 로드하여 File/Blob을 지원한다',()=>{
- assert.match(frontend,/loadBrowserTus\(\)/);
- assert.match(frontend,/cdn\.jsdelivr\.net\/npm\/tus-js-client@4\.3\.1\/dist\/tus\.min\.js/);
- assert.match(frontend,/document\.createElement\('script'\)/);
- assert.match(frontend,/window\.tus\?\.Upload/);
- assert.doesNotMatch(frontend,/import\('https:\/\/esm\.sh\/tus-js-client/);
- assert.match(frontend,/const upload=new tus\.Upload\(file,/);
- assert.match(frontend,/const signed=record\.photoId/);
+test('서명된 PUT 업로드만 허용하여 TUS JWS 거부 오류 방지',()=>{
+ assert.match(frontend,/const target=new URL\(url\)/);
+ assert.match(frontend,/target\.origin!==expected/);
+ assert.match(frontend,/\/storage\/v1\/object\/upload\/sign\//);
+ assert.match(frontend,/const xhr=new XMLHttpRequest\(\)/);
+ assert.match(frontend,/xhr\.open\('PUT',url,true\)/);
+ assert.match(frontend,/data\.append\('cacheControl','3600'\)/);
+ assert.match(frontend,/data\.append\('',file,file\.name\)/);
+ assert.doesNotMatch(frontend,/tus-js-client|x-signature|upload\/resumable/);
+ assert.match(api,/uploadUrl:signed\.signedUrl/);
+ assert.match(api,/uploadUrl:data\.signedUrl/);
  assert.match(frontend,/await api\('photo-finish'/);
+ assert.match(frontend,/const signed=record\.photoId/);
 });
