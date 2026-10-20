@@ -190,8 +190,11 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
    await supabase.from('monitoring_report_photos').delete().eq('id',photoId);
    throw fail(500,'사진 업로드 권한을 발급하지 못했습니다.');
   }
-  const base=env('SUPABASE_URL').replace(/\.supabase\.co$/i,'.storage.supabase.co');
-  return {photoId,path,token:signed.token,bucket:BUCKET,tusEndpoint:base+'/storage/v1/upload/resumable',maxBytes:MAX_FILE};
+  // Storage signed PUT URL avoids TUS's Invalid Compact JWS error on this project.
+  // The URL contains a short-lived upload token; never log it.
+  if(!signed.signedUrl?.startsWith(env('SUPABASE_URL')+'/storage/v1/object/upload/sign/'))
+   throw fail(503,'서명된 업로드 URL이 올바르지 않습니다.');
+  return {photoId,uploadUrl:signed.signedUrl,maxBytes:MAX_FILE};
  }
  if(body.action==='photo-retry'){
   const {photo}=await photoBelongs(body.photoId,group);
@@ -207,8 +210,9 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   }
   const {data,error}=await supabase.storage.from(BUCKET).createSignedUploadUrl(photo.storage_path);
   if(error||!data)throw fail(500,'재업로드 권한을 발급하지 못했습니다.');
-  const base=env('SUPABASE_URL').replace(/\.supabase\.co$/i,'.storage.supabase.co');
-  return {photoId:photo.id,path:photo.storage_path,token:data.token,bucket:BUCKET,tusEndpoint:base+'/storage/v1/upload/resumable'};
+  if(!data.signedUrl?.startsWith(env('SUPABASE_URL')+'/storage/v1/object/upload/sign/'))
+   throw fail(503,'재업로드 URL이 올바르지 않습니다.');
+  return {photoId:photo.id,uploadUrl:data.signedUrl};
  }
  if(body.action==='photo-abort'){
   const {photo}=await photoBelongs(body.photoId,group);
