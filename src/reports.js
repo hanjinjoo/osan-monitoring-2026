@@ -8,7 +8,7 @@ let root, config, group, token, onBack, bookings, view, sessionId=0;
 const tabs={integrated:['major','employment','general'],startup:['startup']};
 const statusLabel={missing:'미작성',draft:'작성 중',completed:'작성 완료',not_conducted:'미실시'};
 const fmtBytes=n=>n>=1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.max(1,Math.ceil(n/1024))+' KB';
-const selfState=()=>({page:'list',items:[],filter:'all',category:'all',search:'',selected:null,photos:[],report:null,draft:null,dirty:false,saving:false,revision:0,photoUploads:[],message:'',error:'',loading:true});
+const selfState=()=>({page:'list',items:[],filter:'all',category:'all',search:'',selected:null,photos:[],pendingPhoto:null,report:null,draft:null,dirty:false,saving:false,revision:0,photoUploads:[],message:'',error:'',loading:true});
 let state=selfState(), autosaveTimer=null, activeUploads=new Set();
 const selectedScope=()=>state.items.find(x=>x.club_id===state.selected);
 function apiUrl(){
@@ -79,19 +79,21 @@ function photoHtml(){
  const photos=state.photos.map(p=>'<div class="report-photo-tile" data-photo-id="'+esc(p.id)+'">'+
   '<button type="button" class="report-photo-preview" data-r-action="view-photo" data-id="'+esc(p.id)+'" aria-label="고화질 사진 크게 보기">'+
   (p.preview_url?'<img loading="lazy" src="'+esc(p.preview_url)+'" alt="첨부된 활동 사진" />':'<span class="report-photo-fallback">🖼 사진</span>')+'</button>'+
-  '<div class="report-photo-foot"><span title="'+esc(p.original_filename)+'">'+esc(p.original_filename)+'</span><button class="report-trash" type="button" data-r-action="delete-photo" data-id="'+esc(p.id)+'" aria-label="사진 삭제">×</button></div></div>').join('');
+  '<div class="report-photo-foot"><span title="'+esc(p.original_filename)+'">'+esc(p.original_filename)+'</span>'+
+  (state.draft?.status==='completed'?'':'<button class="report-trash" type="button" data-r-action="delete-photo" data-id="'+esc(p.id)+'" aria-label="사진 삭제">×</button>')+'</div></div>').join('');
  const uploading=state.photoUploads.map(f=>'<div class="report-photo-tile report-photo-uploading"><div class="report-upload-symbol">↑</div>'+
   '<strong>'+esc(f.filename)+'</strong><progress value="'+f.percent+'" max="100"></progress>'+
   '<small>'+esc(f.status)+(f.percent>0?' · '+f.percent+'%':'')+'</small>'+
   (f.error?'<div class="report-failed-actions"><button type="button" class="button small" data-r-action="retry-photo" data-id="'+esc(f.id)+'">재시도</button><button type="button" class="button small" data-r-action="discard-photo" data-id="'+esc(f.id)+'">제거</button></div>':'')+'</div>').join('');
  return '<div class="report-photos-head"><h3>모니터링 진행 사진</h3><span>서버 보관 '+state.photos.length+'장</span></div>'+
-  '<p class="report-helper">고화질 원본을 별도 비공개 저장소에 보관합니다. 파일당 최대 50MB 처리 설계이며, 실제 Supabase 프로젝트 제한이 더 작을 수 있습니다.</p>'+
-  '<div class="report-photo-actions"><button type="button" class="button" data-r-action="camera">📷 카메라로 촬영</button>'+
-  '<button type="button" class="button" data-r-action="gallery">▧ 갤러리에서 선택</button>'+
+  '<p class="report-helper">동아리당 사진은 정확히 1장입니다. 최대 50MB의 원본을 비공개 저장하며, 새 사진 저장이 성공하면 기존 사진을 교체합니다. 무료 플랜의 전체 사진 저장 한도는 약 850MB입니다.</p>'+
+  '<div class="report-photo-actions"><button type="button" class="button" data-r-action="camera" '+(state.photoUploads.length?'disabled':'')+'>📷 '+(photos?'새 사진 촬영·교체':'카메라로 촬영')+'</button>'+
+  '<button type="button" class="button" data-r-action="gallery" '+(state.photoUploads.length?'disabled':'')+'>▧ '+(photos?'갤러리 사진으로 교체':'갤러리에서 선택')+'</button>'+
   '<input id="report-camera-input" type="file" accept="image/*" capture="environment" hidden>'+
-  '<input id="report-gallery-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple hidden></div>'+
+  '<input id="report-gallery-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" hidden></div>'+
+  (state.pendingPhoto?'<div class="report-banner is-error">이전에 완료되지 않은 사진 업로드가 있습니다. 새 사진을 선택하기 전에 미완료 항목을 정리하세요. <button type="button" class="button small" data-r-action="discard-pending">미완료 업로드 정리</button></div>':'')+
   '<div class="report-photo-grid">'+(photos+uploading||'<div class="report-empty report-photo-empty">첨부된 사진이 없습니다.</div>')+'</div>'+
-  '<p class="report-helper">사진별 업로드 상태와 글 저장 상태는 별도입니다. 사진이 모두 완료될 때까지 페이지를 닫지 마세요.</p>';
+  '<p class="report-helper">기존 사진이 있다면 새 사진 저장 성공 전까지 그대로 보존합니다. 작성 완료하려면 사진 1장이 필요해요. 촬영한 사진은 기기와 브라우저에 따라 카메라 앱 또는 카메라 선택 화면이 열릴 수 있습니다.</p>';
 }
 function editorHtml(){
  const x=selectedScope(),d=state.draft||draftFields(null);
@@ -159,7 +161,7 @@ async function open(clubId){
   const data=await api('report-get',{clubId});
   if(current!==sessionId)return;
   const x=selectedScope(),defaults=dateTimeFor(x);
-  state.report=data.report;state.photos=data.photos;
+  state.report=data.report;state.photos=data.photos;state.pendingPhoto=data.pendingPhoto||null;
   state.draft={...draftFields(data.report),
    monitoring_date:data.report?.monitoring_date||defaults.date,
    monitoring_time:(data.report?.monitoring_time||defaults.time||'').slice(0,5)};
@@ -196,16 +198,16 @@ async function save(status){
  }
  if(effective==='completed'){
   if(activeUploads.size){setMessage('사진 업로드가 완료된 후 작성 완료를 눌러 주세요.',true);return false}
-  if(state.photoUploads.some(p=>p.error)){
-    if(!window.confirm('업로드에 실패한 사진이 있습니다. 다시 업로드하거나 제거할 수 있습니다. 실패한 사진을 제외하고 작성 완료하시겠습니까?'))return false;
+  if(state.photoUploads.some(p=>p.error)||state.pendingPhoto){
+    setMessage('미완료 사진을 재시도하거나 정리한 뒤 작성 완료해 주세요.',true);return false;
   }
   const d=state.draft;
   if(!d.monitoring_date||!d.monitoring_time||!d.monitoring_location.trim()||!d.activity_description.trim()||
     !d.staff_evaluation.trim()||!d.staff_opinion.trim()){
     setMessage('작성 완료하려면 점검일시·장소·활동내용·담당자평가·담당자의견을 모두 입력해 주세요.',true);return false;
   }
-  if(!state.photos.length&&state.photoUploads.length===0){
-   if(!window.confirm('첨부된 사진이 없습니다. 사진 없이 작성 완료하시겠습니까?'))return false;
+  if(state.photos.length!==1){
+   setMessage('모니터링 완료에는 해당 동아리의 사진 1장을 첨부해야 해요.',true);return false;
   }
  }
  const rev=state.revision;
@@ -249,6 +251,7 @@ async function imageUpload(file,existing=null){
  if(!mime&&/\.heif$/i.test(file.name))mime='image/heif';
  if(!fileTypes.includes(mime)){setMessage('지원하지 않는 이미지 형식입니다: '+file.name,true);return}
  if(file.size<=0||file.size>MAX_PHOTO){setMessage('파일당 50MB 이내 이미지여야 합니다: '+file.name,true);return}
+ if(state.pendingPhoto&&!existing){setMessage('이전의 미완료 사진을 먼저 정리해 주세요.',true);return}
  if(state.dirty||!state.report){if(!await save('draft'))return}
  const record=existing||{id:crypto.randomUUID(),file,filename:file.name,percent:0,status:'업로드 준비 중',error:false};
  record.error=false;record.status='업로드 준비 중';record.percent=0;
@@ -280,7 +283,7 @@ async function imageUpload(file,existing=null){
    }).catch(reject);
   });
   const done=await api('photo-finish',{photoId:signed.photoId});
-  state.photos.push(done.photo);
+  state.photos=[done.photo];state.pendingPhoto=null;
   state.photoUploads=state.photoUploads.filter(p=>p.id!==record.id);
   photoSectionUpdate();
   setMessage('사진이 안전하게 저장됐습니다.');
@@ -291,7 +294,8 @@ async function imageUpload(file,existing=null){
 }
 async function photoFiles(files){
  if(!files?.length)return;
- for(const file of Array.from(files))await imageUpload(file);
+ if(state.photos.length&&!(window.confirm('기존 사진은 새 사진이 정상적으로 업로드된 후 교체됩니다. 계속할까요?')))return;
+ await imageUpload(files[0]);
 }
 async function deletePhoto(id){
  if(!window.confirm('선택한 사진을 삭제할까요? 삭제하면 복구할 수 없습니다.'))return;
@@ -323,6 +327,13 @@ async function bind(){
   if(action==='retry-photo'){
    const f=state.photoUploads.find(p=>p.id===id);
    if(f)await imageUpload(f.file,f)
+  }
+  if(action==='discard-pending'){
+   if(!state.pendingPhoto)return;
+   if(!window.confirm('이전 미완료 업로드를 정리하고 새 사진을 선택할까요? 기존에 저장 완료한 사진은 그대로 유지됩니다.'))return;
+   try{await api('photo-abort',{photoId:state.pendingPhoto.id});state.pendingPhoto=null;photoSectionUpdate();setMessage('미완료 업로드를 정리했습니다.')}
+   catch(ex){setMessage('미완료 업로드 정리에 실패했습니다. '+ex.message,true)}
+   return;
   }
   if(action==='discard-photo'){
    const f=state.photoUploads.find(p=>p.id===id);
