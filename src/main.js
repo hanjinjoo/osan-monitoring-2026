@@ -84,7 +84,7 @@ function admin(){
  <div class="admin-header"><div><span class="tag">담당자 전용 관리 화면</span><h2>${groupTitle(app.adminGroup)}</h2><p>예약 일정 변경·취소 및 특정 시간 차단을 관리합니다.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="button primary" data-action="reports">▤ 모니터링 결과 관리</button><button class="button" data-action="admin-block">＋ 시간 차단</button><button class="button" data-action="export">⇩ CSV 다운로드</button></div></div>
  <div class="stats"><div class="stat"><span>전체 동아리</span><strong>${all.length}</strong></div><div class="stat"><span>예약 완료</span><strong>${bookedCount}</strong></div><div class="stat"><span>미예약</span><strong>${all.length-bookedCount}</strong></div></div>
  <div class="admin-controls"><input class="control" id="admin-search" placeholder="동아리명 검색" value="${esc(app.adminSearch)}" aria-label="동아리명 검색"><select class="control" id="admin-category"><option value="all">전체 유형</option>${filterOptions.map(k=>`<option value="${k}" ${app.adminFilter===k?'selected':''}>${CATEGORIES[k].name}</option>`).join('')}</select><button class="button" data-action="admin-missing">미예약 동아리 보기</button><button class="button" data-action="refresh">↻ 새로고침</button></div>
- <div class="admin-list">${rows.length?`<table class="admin-table"><thead><tr><th>유형</th><th>동아리명</th><th>예약 날짜</th><th>시간</th><th>장소</th><th>상태</th><th>관리</th></tr></thead><tbody>${rows.map(r=>{const c=clubById(r.club_id);return `<tr><td>${esc(CATEGORIES[c?.category||'major'].label)}</td><td><strong>${esc(c?.name)}</strong></td><td>${esc(r.reservation_date)}</td><td>${esc(r.reservation_time.slice(0,5))}</td><td>${esc(r.reservation_location||"장소 미입력")}</td><td><span class="tag ${r.status==='confirmed'?'green':'gray'}">${r.status==='confirmed'?'예약 완료':'취소'}</span></td><td>${r.status==='confirmed'?`<div class="table-actions"><button class="button small" data-action="edit" data-id="${esc(r.id)}">변경</button><button class="button small danger" data-action="cancel" data-id="${esc(r.id)}">취소</button></div>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty-state"><div class="emoji">▤</div>표시할 예약이 없습니다.</div>`}</div>
+ <div class="admin-list">${rows.length?`<table class="admin-table"><thead><tr><th>유형</th><th>동아리명</th><th>예약 날짜</th><th>시간</th><th>장소</th><th>상태</th><th>관리</th></tr></thead><tbody>${rows.map(r=>{const c=clubById(r.club_id);return `<tr><td>${esc(CATEGORIES[c?.category||'major'].label)}</td><td><strong>${esc(c?.name)}</strong></td><td>${esc(r.reservation_date)}</td><td>${esc(r.reservation_time.slice(0,5))}</td><td>${esc(r.reservation_location||"장소 미입력")}</td><td><span class="tag ${r.status==='confirmed'?'green':'gray'}">${r.status==='confirmed'?'예약 완료':'취소'}</span></td><td>${r.status==='confirmed'?`<div class="table-actions"><button class="button small" data-action="edit" data-id="${esc(r.id)}">변경</button><button class="button small danger" data-action="cancel" data-id="${esc(r.id)}">취소</button></div>`:`<div class="table-actions"><button type="button" class="button small danger" data-action="delete-cancelled" data-id="${esc(r.id)}" aria-label="${esc(c?.name||'동아리')}의 취소된 예약 영구 삭제">삭제</button></div>`}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty-state"><div class="emoji">▤</div>표시할 예약이 없습니다.</div>`}</div>
  <div class="admin-bottom"><div class="config-tip">미예약 동아리는 '미예약 동아리 보기'에서 확인할 수 있습니다. 신규 예약은 일반 예약 화면에서 신청해 주세요.</div></div>
  </main></div>`;
 }
@@ -118,6 +118,11 @@ function modalHtml(){
  if(m.type==='cancel'){
   const r=app.bookings.find(x=>x.id===m.id),c=clubById(r?.club_id);if(!r)return '';
   return modalWrap('예약 취소 확인',`<p><strong>${esc(c?.name)}</strong>의 예약을 취소하시겠습니까?</p><dl class="summary-box"><div class="summary-row"><dt>예약 일시</dt><dd>${esc(dateLabel(r.reservation_date))} ${esc(r.reservation_time.slice(0,5))}</dd></div></dl><p>취소하면 해당 시간은 다시 예약 가능한 상태가 됩니다.</p>${actions('예약 취소','commit-cancel','danger')}`);
+ }
+ if(m.type==='delete-cancelled'){
+   const r=app.bookings.find(x=>x.id===m.id),c=clubById(r?.club_id);
+   if(!r||r.status!=='cancelled')return '';
+   return modalWrap('취소된 예약 영구 삭제',`<p><strong>${esc(c?.name||'동아리')}</strong>의 취소된 예약을 데이터베이스에서 완전히 삭제하시겠습니까?</p><dl class="summary-box"><div class="summary-row"><dt>예약 일시</dt><dd>${esc(dateLabel(r.reservation_date))} ${esc(r.reservation_time.slice(0,5))}</dd></div><div class="summary-row"><dt>현재 상태</dt><dd>취소</dd></div></dl><p><strong>주의:</strong> 이 예약과 해당 예약의 변경·취소 이력도 영구 삭제되어 복구할 수 없습니다. 다른 예약과 모니터링 결과 기록은 유지됩니다.</p>${actions('영구 삭제','commit-delete-cancelled','danger')}`);
  }
  if(m.type==='block'){
   const blocks=[...app.blocks].sort((a,b)=>a.blocked_date.localeCompare(b.blocked_date)||a.blocked_time.localeCompare(b.blocked_time));
@@ -193,6 +198,12 @@ root.addEventListener('click',async e=>{
  if(action==='commit-booking'){await execute('create',{clubId:app.modal.clubId,date:app.modal.date,time:app.modal.time,location:app.modal.location},'모니터링 일정이 정상적으로 예약되었습니다.');return}
  if(action==='edit'){const r=app.bookings.find(x=>x.id===id);if(!r)return;app.modal={type:'edit',id,date:r.reservation_date,time:r.reservation_time.slice(0,5),location:r.reservation_location||''};render();return}
  if(action==='cancel'){app.modal={type:'cancel',id};render();return}
+ if(action==='delete-cancelled'){
+  if(!app.adminGroup||!app.token)return;
+  const booking=app.bookings.find(x=>x.id===id);
+  if(!booking||booking.status!=='cancelled')return;
+  app.modal={type:'delete-cancelled',id};render();return;
+ }
  if(action==='commit-edit'){
   const r=app.bookings.find(x=>x.id===app.modal.id);const c=clubById(r?.club_id);
   const err=validateReservation(c,app.modal.date,app.modal.time,app.bookings,app.blocks,cfg,r?.id);
@@ -201,6 +212,12 @@ root.addEventListener('click',async e=>{
  }
  if(action==='commit-location'){const location=(root.querySelector('#edit-location')?.value||'').trim();if(location.length>120){app.modal.error='장소는 120자 이내로 입력해 주세요.';render();return}await execute('update-location',{token:app.token,reservationId:app.modal.id,location},'모니터링 장소를 수정했습니다.');return}
   if(action==='commit-cancel'){await execute('cancel',{token:app.token,reservationId:app.modal.id},'모니터링 일정이 취소되었습니다.');return}
+ if(action==='commit-delete-cancelled'){
+  if(app.modal?.type!=='delete-cancelled'||!app.adminGroup||!app.token)return;
+  const booking=app.bookings.find(x=>x.id===app.modal.id);
+  if(!booking||booking.status!=='cancelled'){app.modal.error='취소된 예약만 삭제할 수 있습니다. 새로고침해 주세요.';render();return}
+  await execute('delete-cancelled',{token:app.token,reservationId:booking.id},'취소된 예약 및 관련 이력을 영구 삭제했습니다.');return;
+ }
  if(action==='admin-block'){app.modal={type:'block',date:cfg.FIRST_DATE,time:''};render();return}
  if(action==='commit-block'){
   if(!app.modal.time){app.modal.error='차단할 시간을 선택해 주세요.';render();return}
