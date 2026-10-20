@@ -82,7 +82,7 @@ function photoHtml(){
  const uploading=state.photoUploads.map(f=>'<div class="report-photo-tile report-photo-uploading"><div class="report-upload-symbol">↑</div>'+
   '<strong>'+esc(f.filename)+'</strong><progress value="'+f.percent+'" max="100"></progress>'+
   '<small>'+esc(f.status)+(f.percent>0?' · '+f.percent+'%':'')+'</small>'+
-  (f.error?'<button type="button" class="button small" data-r-action="retry-photo" data-id="'+esc(f.id)+'">재시도</button>':'')+'</div>').join('');
+  (f.error?'<div class="report-failed-actions"><button type="button" class="button small" data-r-action="retry-photo" data-id="'+esc(f.id)+'">재시도</button><button type="button" class="button small" data-r-action="discard-photo" data-id="'+esc(f.id)+'">제거</button></div>':'')+'</div>').join('');
  return '<div class="report-photos-head"><h3>모니터링 진행 사진</h3><span>서버 보관 '+state.photos.length+'장</span></div>'+
   '<p class="report-helper">고화질 원본을 별도 비공개 저장소에 보관합니다. 파일당 최대 50MB 처리 설계이며, 실제 Supabase 프로젝트 제한이 더 작을 수 있습니다.</p>'+
   '<div class="report-photo-actions"><button type="button" class="button" data-r-action="camera">📷 카메라로 촬영</button>'+
@@ -194,6 +194,10 @@ async function save(status){
   setMessage('미실시 사유를 먼저 입력해 주세요.',true);return false;
  }
  if(effective==='completed'){
+  if(activeUploads.size){setMessage('사진 업로드가 완료된 후 작성 완료를 눌러 주세요.',true);return false}
+  if(state.photoUploads.some(p=>p.error)){
+    if(!window.confirm('업로드에 실패한 사진이 있습니다. 다시 업로드하거나 제거할 수 있습니다. 실패한 사진을 제외하고 작성 완료하시겠습니까?'))return false;
+  }
   const d=state.draft;
   if(!d.monitoring_date||!d.monitoring_time||!d.monitoring_location.trim()||!d.activity_description.trim()||
     !d.staff_evaluation.trim()||!d.staff_opinion.trim()){
@@ -224,17 +228,19 @@ async function save(status){
 }
 async function showList(){
  clearTimeout(autosaveTimer);
+ if(state.photoUploads.some(p=>p.error)&&!window.confirm('업로드 실패한 사진이 있습니다. 목록을 나가면 재시도 대상이 사라집니다. 이동하시겠습니까?'))return;
  if(activeUploads.size){setMessage('사진 업로드 중입니다. 완료될 때까지 기다려 주세요.',true);return}
  if(state.dirty&&!(await save('draft')))return;
  sessionId++;state.page='list';state.selected=null;state.loading=true;render();
  try{await loadList();state.loading=false;state.message='';state.error='';render()}catch(e){state.loading=false;state.error=e.message;render()}
 }
 async function leave(){
+ if(state.photoUploads.some(p=>p.error)&&!window.confirm('업로드 실패한 사진이 있습니다. 이 화면을 나가시겠습니까?'))return;
  if(activeUploads.size){setMessage('사진 업로드를 완료한 후 이동해 주세요.',true);return}
  if(state.page==='editor'&&state.dirty&&!(await save('draft')))return;
  clearTimeout(autosaveTimer);sessionId++;root=null;onBack();
 }
-async function imageUpload(file){
+async function imageUpload(file,existing=null){
  if(!file)return;
  const fileTypes=['image/jpeg','image/png','image/webp','image/heic','image/heif'];
  let mime=file.type.toLowerCase();
@@ -243,10 +249,15 @@ async function imageUpload(file){
  if(!fileTypes.includes(mime)){setMessage('지원하지 않는 이미지 형식입니다: '+file.name,true);return}
  if(file.size<=0||file.size>MAX_PHOTO){setMessage('파일당 50MB 이내 이미지여야 합니다: '+file.name,true);return}
  if(state.dirty||!state.report){if(!await save('draft'))return}
- const record={id:crypto.randomUUID(),file,filename:file.name,percent:0,status:'업로드 준비 중',error:false};
- state.photoUploads.push(record);photoSectionUpdate();activeUploads.add(record.id);
+ const record=existing||{id:crypto.randomUUID(),file,filename:file.name,percent:0,status:'업로드 준비 중',error:false};
+ record.error=false;record.status='업로드 준비 중';record.percent=0;
+ if(!existing)state.photoUploads.push(record);
+ photoSectionUpdate();activeUploads.add(record.id);
  try{
-  const signed=await api('photo-start',{clubId:state.selected,filename:file.name,fileSize:file.size,mime});
+  const signed=record.photoId
+   ?await api('photo-retry',{photoId:record.photoId})
+   :await api('photo-start',{clubId:state.selected,filename:file.name,fileSize:file.size,mime});
+  record.photoId=signed.photoId;
   record.status='고화질 사진 전송 중';photoSectionUpdate();
   // 브라우저 ESM 로드. tus-js-client는 Supabase 권장 resumable upload 방식.
   const tus=await import('https://esm.sh/tus-js-client@4.3.1');
@@ -305,7 +316,15 @@ async function bind(){
   if(action==='delete-photo'){await deletePhoto(id);return}
   if(action==='retry-photo'){
    const f=state.photoUploads.find(p=>p.id===id);
-   if(f){state.photoUploads=state.photoUploads.filter(p=>p.id!==id);await imageUpload(f.file)}
+   if(f)await imageUpload(f.file,f)
+  }
+  if(action==='discard-photo'){
+   const f=state.photoUploads.find(p=>p.id===id);
+   if(f?.photoId){
+    try{await api('photo-abort',{photoId:f.photoId})}
+    catch(ex){setMessage('미완료 사진 정리에 실패했습니다. '+ex.message,true);return}
+   }
+   state.photoUploads=state.photoUploads.filter(p=>p.id!==id);photoSectionUpdate();
   }
  });
  root.addEventListener('input',e=>{
