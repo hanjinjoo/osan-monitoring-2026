@@ -56,3 +56,8 @@ test('soft-delete and restore reports without removing private evidence photo',(
  assert.match(reports,/data-r-action="restore-report"/);
  assert.doesNotMatch(reportApi,/storage\.from\(BUCKET\)\.remove\(\[.*deleted_at/);
 });
+
+test('창업 관리자 로그인 직후 창업 예약 그룹을 먼저 선택하여 읽는다',()=>{
+ assert.match(main,/app\.adminGroup=result\.group;app\.token=result\.token;app\.route='admin';/);
+ assert.match(main,/const group=\(\)=>app\.route==='home'\?CATEGORIES\[app\.category\]\.group/);
+});
