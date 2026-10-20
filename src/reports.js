@@ -10,25 +10,36 @@ const statusLabel={missing:'미작성',draft:'작성 중',completed:'작성 완�
 const fmtBytes=n=>n>=1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.max(1,Math.ceil(n/1024))+' KB';
 const selfState=()=>({page:'list',items:[],filter:'all',category:'all',search:'',selected:null,photos:[],pendingPhoto:null,report:null,draft:null,dirty:false,saving:false,revision:0,photoUploads:[],message:'',error:'',loading:true});
 let state=selfState(), autosaveTimer=null, activeUploads=new Set();
-let browserTusPromise=null;
-function loadBrowserTus(){
- // tus-js-client의 npm/ESM 기본 진입점은 일부 CDN에서 Node용으로 해석될 수 있다.
- // 공식 브라우저 UMD(dist) 번들만 로드하여 iPhone Safari File/Blob을 안전하게 처리한다.
- if(window.tus?.Upload)return Promise.resolve(window.tus);
- if(!browserTusPromise){
-  browserTusPromise=new Promise((resolve,reject)=>{
-   const script=document.createElement('script');
-   script.src='https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js';
-   script.async=true;
-   script.onload=()=>{
-    if(window.tus?.Upload)resolve(window.tus);
-    else reject(new Error('사진 업로드 브라우저 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.'));
-   };
-   script.onerror=()=>reject(new Error('사진 전송 모듈을 다운로드하지 못했습니다. 인터넷 연결을 확인하고 재시도해 주세요.'));
-   document.head.appendChild(script);
-  }).catch(error=>{browserTusPromise=null;throw error});
- }
- return browserTusPromise;
+function uploadSignedPhoto(url,file,record){
+ // Supabase SDK uploadToSignedUrl matches PUT multipart FormData; original bytes preserved.
+ // A signed URL is a short-lived credential. Never log it or persist it.
+ const expected=new URL(config.API_URL).origin;
+ const target=new URL(url);
+ if(target.origin!==expected||!target.pathname.startsWith('/storage/v1/object/upload/sign/'))
+  throw new Error('보안상 허용되지 않은 사진 업로드 주소입니다.');
+ return new Promise((resolve,reject)=>{
+  const xhr=new XMLHttpRequest();
+  xhr.open('PUT',url,true);
+  xhr.timeout=10*60*1000;
+  const fail=()=>reject(new Error('사진 전송이 중단됐습니다. 네트워크 연결을 확인하고 재시도해 주세요.'));
+  xhr.onerror=fail;xhr.ontimeout=fail;xhr.onabort=fail;
+  xhr.upload.onprogress=e=>{
+   if(e.lengthComputable&&e.total){
+    record.percent=Math.min(99,Math.round(e.loaded/e.total*100));
+    record.status='업로드 중';photoSectionUpdate();
+   }
+  };
+  xhr.onload=()=>{
+   if(xhr.status>=200&&xhr.status<300){record.percent=100;resolve();return}
+   let explanation='';
+   try{const r=JSON.parse(xhr.responseText);explanation=String(r?.message||r?.error||'').slice(0,110)}catch{}
+   reject(new Error('사진 저장소 응답 '+xhr.status+(explanation?' · '+explanation:'')));
+  };
+  const data=new FormData();
+  data.append('cacheControl','3600');
+  data.append('',file,file.name);
+  xhr.send(data);
+ });
 }
 const selectedScope=()=>state.items.find(x=>x.club_id===state.selected);
 function apiUrl(){
@@ -284,25 +295,7 @@ async function imageUpload(file,existing=null){
   record.photoId=signed.photoId;
   record.status=signed.alreadyUploaded?'사진 전송 완료 · 저장 확인 중':'고화질 사진 전송 중';photoSectionUpdate();
   if(!signed.alreadyUploaded){
-  // 브라우저 ESM 로드. tus-js-client는 Supabase 권장 resumable upload 방식.
-  const tus=await loadBrowserTus();
-  await new Promise((resolve,reject)=>{
-   const upload=new tus.Upload(file,{
-    endpoint:signed.tusEndpoint,
-    retryDelays:[0,1500,3000,5000,10000],
-    chunkSize:6*1024*1024,
-    uploadDataDuringCreation:true,
-    metadata:{bucketName:signed.bucket,objectName:signed.path,contentType:mime,cacheControl:'3600'},
-    headers:{'x-signature':signed.token},
-    removeFingerprintOnSuccess:true,
-    onError:reject,onSuccess:resolve,
-    onProgress:(sent,total)=>{record.percent=Math.min(100,Math.round(sent/total*100));record.status='업로드 중';photoSectionUpdate();}
-   });
-   upload.findPreviousUploads().then(prev=>{
-    if(prev.length)upload.resumeFromPreviousUpload(prev[0]);
-    upload.start();
-   }).catch(reject);
-  });
+  await uploadSignedPhoto(signed.uploadUrl,file,record);
   }
   const done=await api('photo-finish',{photoId:signed.photoId});
   state.photos=[done.photo];state.pendingPhoto=null;
