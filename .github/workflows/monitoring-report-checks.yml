@@ -30,3 +30,7 @@ jobs:
           deno-version: v2.x
       - name: Edge Function type check
         run: deno check --node-modules-dir=auto supabase/functions/monitoring-reports/index.ts
+      - name: Deployed reporting API rejects anonymous callers
+        env:
+          REPORT_API_URL: https://irqovqzrdvqmuuuvxcmt.supabase.co/functions/v1/monitoring-reports
+        run: node --test tests/monitoring-api-live.test.mjs
