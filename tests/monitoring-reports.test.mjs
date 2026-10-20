@@ -7,6 +7,7 @@ const read=p=>fs.readFileSync(path.join(base,p),'utf8');
 const clubs=JSON.parse(read('data/clubs.json'));
 const scopeSql=read('supabase/migrations/202610200001_monitoring_reports.sql');
 const deptSql=read('supabase/migrations/202610200002_report_departments.sql');
+const onePhotoSql=read('supabase/migrations/202610200003_one_photo_per_report.sql');
 const frontend=read('src/reports.js');
 const css=read('src/reports.css');
 const api=read('supabase/functions/monitoring-reports/index.ts');
@@ -47,7 +48,8 @@ test('기존 예약 함수·차단 경로를 변경하지 않고 결과관리만
 });
 test('카메라와 갤러리 입력은 분리, 고화질 TUS 업로드 사용',()=>{
  assert.match(frontend,/capture="environment"/);
- assert.match(frontend,/id="report-gallery-input"[^>]*multiple/);
+ assert.match(frontend,/id="report-gallery-input"/);
+ assert.doesNotMatch(frontend,/id="report-gallery-input"[^>]*multiple/);
  assert.match(frontend,/tus-js-client/);
  assert.match(frontend,/x-signature/);
  assert.match(frontend,/onProgress/);
@@ -72,4 +74,22 @@ test('비공개 사진 저장·민감정보 RLS와 service role 전용 접근',(
 });
 test('지금 단계에서 PDF·HWP 자동생성은 제외',()=>{
  assert.doesNotMatch(frontend,/window\.print\(|pdfmake|jspdf|html2canvas|PDFDocument/);
+});
+
+test('한 동아리 증빙사진은 정확히 1장, 새 사진 실패 시 기존 유지',()=>{
+ assert.match(onePhotoSql,/monitoring_photo_one_ready_per_report/);
+ assert.match(onePhotoSql,/monitoring_photo_one_pending_per_report/);
+ assert.match(onePhotoSql,/monitoring_finish_single_photo/);
+ assert.match(onePhotoSql,/FOR UPDATE OF rep/);
+ assert.match(onePhotoSql,/DELETE FROM public.monitoring_report_photos/);
+ assert.match(onePhotoSql,/GRANT EXECUTE ON FUNCTION public.monitoring_finish_single_photo\(uuid,text\) TO service_role/);
+ assert.match(api,/monitoring_finish_single_photo/);
+ assert.match(api,/replaced_path/);
+ assert.match(api,/if\(ready\.length!==MAX_PHOTOS_PER_REPORT\)/);
+ assert.match(api,/report\.status==='completed'\)throw fail\(409/);
+ assert.match(api,/STORAGE_SOFT_LIMIT_BYTES=850_000_000/);
+ assert.match(frontend,/state\.photos=\[done\.photo\]/);
+ assert.match(frontend,/discard-pending/);
+ assert.match(frontend,/if\(state\.photos\.length!==1\)/);
+ assert.match(frontend,/await imageUpload\(files\[0\]\)/);
 });
