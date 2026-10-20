@@ -18,6 +18,8 @@ const TERM='2026-2';
 const BUCKET='monitoring-report-photos';
 const MAX_FILE=50_000_000; // Free 프로젝트 파일당 최대 50 MB(10진), Storage 전역 설정과 재확인.
 const MAX_PHOTOS=100;
+const TEST_MODE_MAX_REPORT_PHOTOS=6; // 소량 테스트 전용, 본 운영에서 재검토
+const TEST_MODE_MAX_TOTAL_BYTES=80_000_000; // Free 1GB 공간 보존용 약 80 MB 소프트 제한
 const env=(n:string)=>Deno.env.get(n)||'';
 const supabase=createClient(env('SUPABASE_URL'),env('SUPABASE_SERVICE_ROLE_KEY'),{
  auth:{persistSession:false,autoRefreshToken:false}
@@ -160,6 +162,11 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   if(!Number.isSafeInteger(size)||size<=0||size>MAX_FILE)throw fail(400,'사진 크기는 파일당 최대 50MB 이내여야 합니다. 실제 프로젝트 한도는 다를 수 있습니다.');
   const photos=await photosFor(report.id);
   if(photos.length>=MAX_PHOTOS)throw fail(400,'사진은 한 동아리에서 최대 100장까지 첨부할 수 있습니다.');
+  if(photos.length>=TEST_MODE_MAX_REPORT_PHOTOS)throw fail(400,'무료 플랜 테스트 모드에서는 동아리당 최대 6장만 업로드할 수 있습니다. 실제 운영 전 용량 정책을 재설정합니다.');
+  const {data:recordSizes,error:sizeError}=await supabase.from('monitoring_report_photos').select('file_size');
+  if(sizeError)throw fail(503,'현재 사진 사용량을 확인할 수 없습니다. 업로드를 중단합니다.');
+  const totalUsed=(recordSizes||[]).reduce((sum,p)=>sum+Number(p.file_size||0),0);
+  if(totalUsed+size>TEST_MODE_MAX_TOTAL_BYTES)throw fail(413,'무료 플랜 테스트 사진 임시 총량(80MB)에 도달했습니다. 운영 용량을 검토해 주세요.');
   const photoId=crypto.randomUUID();
   const path=TERM+'/'+group+'/'+scope.club_id+'/'+photoId+'.'+ext[mime];
   const {data:created,error:createError}=await supabase.from('monitoring_report_photos').insert({
