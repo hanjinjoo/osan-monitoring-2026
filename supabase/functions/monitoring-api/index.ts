@@ -20,8 +20,8 @@ const json=(data:unknown,status=200)=>new Response(JSON.stringify({ok:status<400
   status,headers:{...cors,'Content-Type':'application/json; charset=utf-8'},
 });
 const isGroup=(x:unknown):x is 'integrated'|'startup'=>x==='integrated'||x==='startup';
-const isDate=(x:unknown)=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(`${x}T12:00:00+09:00`));
-const isTime=(x:unknown)=>typeof x==='string'&&/^\d{2}:\d{2}$/.test(x);
+const isDate=(x:unknown):x is string=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(`${x}T12:00:00+09:00`));
+const isTime=(x:unknown):x is string=>typeof x==='string'&&/^\d{2}:\d{2}$/.test(x);
 const isUuid=(x:unknown)=>typeof x==='string'&&/^[a-f0-9-]{36}$/i.test(x);
 
 function bytesToB64Url(bytes:Uint8Array){return btoa(Array.from(bytes,x=>String.fromCharCode(x)).join('')).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
