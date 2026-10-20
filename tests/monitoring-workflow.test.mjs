@@ -62,10 +62,11 @@ test('창업 관리자 로그인 직후 창업 예약 그룹을 먼저 선택하
  assert.match(main,/const group=\(\)=>app\.route==='home'\?CATEGORIES\[app\.category\]\.group/);
 });
 
-test('공개 예약조회는 다른 동아리 진행장소를 노출하지 않고 관리자에게만 전달',()=>{
- assert.match(api,/const publicFields='id,club_id,reservation_group,reservation_date,reservation_time,status,created_at,updated_at'/);
+test('예약 장소 공개 범위는 확정 예약에 한정하고 관리자 조회·수정 권한은 유지',()=>{
+ assert.match(api,/const publicFields='id,club_id,reservation_group,reservation_date,reservation_time,reservation_location,status,created_at,updated_at'/);
  assert.match(api,/const adminFields='id,club_id,reservation_group,reservation_date,reservation_time,reservation_location,status,created_at,updated_at'/);
  assert.match(api,/select\(isAdmin\?adminFields:publicFields\)/);
+ assert.match(api,/if\(!isAdmin\)q=q\.eq\('status','confirmed'\)/);
 });
 
 test('일반 달력 예약 상세는 서버에서 확정 예약의 장소를 받아 표시한다',()=>{
