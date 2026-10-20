@@ -26,6 +26,12 @@ jobs:
           node --check src/reports.js
       - name: Regression and report tests
         run: npm test
+      - name: Verify pinned tus browser bundle exists
+        run: |
+          curl --fail --location --retry 3 --silent --show-error --max-time 30 \
+            'https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/dist/tus.min.js' \
+            --output /tmp/osan-tus-browser.min.js
+          test "$(wc -c </tmp/osan-tus-browser.min.js)" -gt 20000
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
