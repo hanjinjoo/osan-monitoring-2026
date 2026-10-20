@@ -143,6 +143,7 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   }
   if(status==='not_conducted'&&!content.not_conducted_reason.trim())throw fail(400,'미실시 사유를 입력해 주세요.');
   const old=await reportFor(scope);
+  if(status==='completed'&&old?.status==='completed'&&old.completed_at)content.completed_at=old.completed_at;
   if(old){
    if(old.deleted_at)throw fail(409,'삭제된 기록입니다. 먼저 복구해 주세요.');
    if(!Number.isInteger(body.version)||body.version!==old.version)throw fail(409,'다른 화면에서 이 기록이 변경되었습니다. 다시 불러온 뒤 확인해 주세요.');
