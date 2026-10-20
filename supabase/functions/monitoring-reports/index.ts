@@ -16,7 +16,7 @@ const CORS:Record<string,string> = {
 };
 const TERM='2026-2';
 const BUCKET='monitoring-report-photos';
-const MAX_FILE=50*1024*1024; // 실제 프로젝트/버킷 전역 제한이 더 작을 수 있음. 배포 전 확인.
+const MAX_FILE=50_000_000; // Free 프로젝트 파일당 최대 50 MB(10진), Storage 전역 설정과 재확인.
 const MAX_PHOTOS=100;
 const env=(n:string)=>Deno.env.get(n)||'';
 const supabase=createClient(env('SUPABASE_URL'),env('SUPABASE_SERVICE_ROLE_KEY'),{
@@ -229,7 +229,10 @@ Deno.serve(async req=>{
  if(req.method!=='POST')return new Response('Method Not Allowed',{status:405,headers:CORS});
  try{
   if(Number(req.headers.get('content-length')||0)>100000)throw fail(413,'요청 본문이 너무 큽니다.');
-  const body=await req.json();
+  const raw=await req.text();
+  if(raw.length>100000)throw fail(413,'요청 본문이 너무 큽니다.');
+  let body: Record<string,unknown>;
+  try{body=JSON.parse(raw)}catch{throw fail(400,'올바른 JSON 형식이 아닙니다.');}
   if(!body||typeof body!=='object'||Array.isArray(body))throw fail(400,'요청 형식이 올바르지 않습니다.');
   const group=await groupFromToken(body.token);
   if(!group)throw fail(401,'담당자 인증이 만료되었습니다. 다시 로그인해 주세요.');
