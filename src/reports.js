@@ -77,7 +77,8 @@ function dateTimeFor(x){
 }
 function photoHtml(){
  const photos=state.photos.map(p=>'<div class="report-photo-tile" data-photo-id="'+esc(p.id)+'">'+
-  (p.preview_url?'<img loading="lazy" src="'+esc(p.preview_url)+'" alt="첨부된 활동 사진" />':'<span class="report-photo-fallback">🖼 사진</span>')+
+  '<button type="button" class="report-photo-preview" data-r-action="view-photo" data-id="'+esc(p.id)+'" aria-label="고화질 사진 크게 보기">'+
+  (p.preview_url?'<img loading="lazy" src="'+esc(p.preview_url)+'" alt="첨부된 활동 사진" />':'<span class="report-photo-fallback">🖼 사진</span>')+'</button>'+
   '<div class="report-photo-foot"><span title="'+esc(p.original_filename)+'">'+esc(p.original_filename)+'</span><button class="report-trash" type="button" data-r-action="delete-photo" data-id="'+esc(p.id)+'" aria-label="사진 삭제">×</button></div></div>').join('');
  const uploading=state.photoUploads.map(f=>'<div class="report-photo-tile report-photo-uploading"><div class="report-upload-symbol">↑</div>'+
   '<strong>'+esc(f.filename)+'</strong><progress value="'+f.percent+'" max="100"></progress>'+
@@ -314,6 +315,11 @@ async function bind(){
   if(action==='camera'){root.querySelector('#report-camera-input')?.click();return}
   if(action==='gallery'){root.querySelector('#report-gallery-input')?.click();return}
   if(action==='delete-photo'){await deletePhoto(id);return}
+  if(action==='view-photo'){
+   try{const image=await api('photo-url',{photoId:id});window.open(image.url,'_blank','noopener,noreferrer')}
+   catch(ex){setMessage(ex.message,true)}
+   return;
+  }
   if(action==='retry-photo'){
    const f=state.photoUploads.find(p=>p.id===id);
    if(f)await imageUpload(f.file,f)
