@@ -175,6 +175,23 @@ async function route(body:Record<string,unknown>,group:'integrated'|'startup'){
   const base=env('SUPABASE_URL').replace(/\.supabase\.co$/i,'.storage.supabase.co');
   return {photoId,path,token:signed.token,bucket:BUCKET,tusEndpoint:base+'/storage/v1/upload/resumable',maxBytes:MAX_FILE};
  }
+ if(body.action==='photo-retry'){
+  const {photo}=await photoBelongs(body.photoId,group);
+  if(photo.upload_status!=='pending')throw fail(409,'이미 업로드가 완료된 사진입니다.');
+  const {data,error}=await supabase.storage.from(BUCKET).createSignedUploadUrl(photo.storage_path);
+  if(error||!data)throw fail(500,'재업로드 권한을 발급하지 못했습니다.');
+  const base=env('SUPABASE_URL').replace(/\.supabase\.co$/i,'.storage.supabase.co');
+  return {photoId:photo.id,path:photo.storage_path,token:data.token,bucket:BUCKET,tusEndpoint:base+'/storage/v1/upload/resumable'};
+ }
+ if(body.action==='photo-abort'){
+  const {photo}=await photoBelongs(body.photoId,group);
+  if(photo.upload_status!=='pending')throw fail(409,'저장 완료된 사진은 일반 삭제 기능을 사용해 주세요.');
+  const {error:removeError}=await supabase.storage.from(BUCKET).remove([photo.storage_path]);
+  if(removeError)throw fail(500,'미완료 사진 정리에 실패했습니다.');
+  const {error}=await supabase.from('monitoring_report_photos').delete().eq('id',photo.id);
+  if(error)throw fail(500,'미완료 사진 목록을 정리하지 못했습니다.');
+  return {aborted:true};
+ }
  if(body.action==='photo-finish'){
   const {photo}=await photoBelongs(body.photoId,group);
   const path=photo.storage_path;
