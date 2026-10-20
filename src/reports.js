@@ -77,7 +77,7 @@ function listHtml(){
  const card=(x)=>'<button type="button" class="report-club" data-r-action="open" data-id="'+esc(x.club_id)+'">'+
   '<span class="report-club-main"><strong>'+esc(x.name)+'</strong><small>'+esc(labelOf(x))+(x.department?' · '+esc(x.department):'')+
   (x.monitoring_date?' · '+esc(x.monitoring_date):'')+'</small></span>'+
-  '<span class="report-club-meta"><span class="report-status '+esc(x.status||'missing')+'">'+esc(statusLabel[x.status||'missing'])+'</span>'+
+  '<span class="report-club-meta"><span class="report-status '+esc(x.status||'missing')+'">'+esc(statusLabel[x.status||'missing'])+'</span>'+(x.recoverable?'<span class="report-status draft">복구 가능</span>':'')+
   '<span class="report-photo-count">사진 '+Number(x.photoCount||0)+'장</span></span><span class="report-chevron">›</span></button>';
  return baseShell('<main class="panel report-panel">'+
   '<div class="report-section-head"><div><span class="tag">담당자 전용</span><h2>'+ (group==='startup'?'창업동아리':'통합 담당자')+' 결과 기록</h2>'+
