@@ -5,6 +5,7 @@ on:
       - 'src/reports.js'
       - 'src/main.js'
       - 'supabase/functions/monitoring-reports/**'
+      - 'supabase/functions/monitoring-api/**'
       - 'supabase/migrations/20261020000*.sql'
       - 'tests/monitoring-reports.test.mjs'
       - '.github/workflows/monitoring-report-checks.yml'
@@ -29,7 +30,9 @@ jobs:
         with:
           deno-version: v2.x
       - name: Edge Function type check
-        run: deno check --node-modules-dir=auto supabase/functions/monitoring-reports/index.ts
+        run: |
+          deno check --node-modules-dir=auto supabase/functions/monitoring-reports/index.ts
+          deno check --node-modules-dir=auto supabase/functions/monitoring-api/index.ts
       - name: Deployed reporting API rejects anonymous callers
         env:
           REPORT_API_URL: https://irqovqzrdvqmuuuvxcmt.supabase.co/functions/v1/monitoring-reports
