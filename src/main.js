@@ -155,9 +155,11 @@ root.addEventListener('click',async e=>{
  if(app.busy)return;
  if(action==='reports'&&app.adminGroup&&app.token){
    app.reportMode=true;app.modal=null;
-   const {mountReports}=await import('./reports.js');
-   await mountReports(root,{config:cfg,group:app.adminGroup,token:app.token,bookings:app.bookings,
-    onBack:()=>{app.reportMode=false;render()}});
+   try{
+    const {mountReports}=await import('./reports.js');
+    await mountReports(root,{config:cfg,group:app.adminGroup,token:app.token,bookings:app.bookings,
+     onBack:()=>{app.reportMode=false;render()}});
+   }catch(ex){app.reportMode=false;flash('결과관리 화면을 불러오지 못했습니다: '+(ex.message||ex),true)}
    return;
   }
   if(action==='category'){app.category=value;app.selectedClub='';app.modal=null;try{await loadState()}catch(ex){flash(ex.message,true)}render();return}
