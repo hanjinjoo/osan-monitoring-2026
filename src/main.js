@@ -3,7 +3,7 @@ import {Service} from './api.js';
 
 const root=document.querySelector('#app');
 const cfg=window.MONITORING_CONFIG || {};
-const app={clubs:[],category:'major',selectedClub:'',month:new Date(2026,9,1,12),weekDate:'2026-10-26',view:'month',bookings:[],blocks:[],modal:null,busy:false,loading:true,adminGroup:null,token:null,adminSearch:'',adminFilter:'all',toast:null,toastTimer:null,updated:null};
+const app={clubs:[],category:'major',selectedClub:'',month:new Date(2026,9,1,12),weekDate:'2026-10-26',view:'month',bookings:[],blocks:[],modal:null,busy:false,loading:true,adminGroup:null,token:null,adminSearch:'',adminFilter:'all',toast:null,toastTimer:null,updated:null,reportMode:false};
 let service;
 const group=()=>app.adminGroup||CATEGORIES[app.category].group;
 const clubById=id=>app.clubs.find(c=>c.id===id);
@@ -19,7 +19,7 @@ async function init(){
   await loadState();
  }catch(e){root.innerHTML=`<div class="app-shell"><section class="panel empty-state"><h2>사이트를 불러오지 못했습니다</h2><p>${esc(e.message)}</p><p>로컬 파일을 직접 여는 대신 웹서버로 실행해 주세요.</p></section></div>`;return;}
  render();
- window.setInterval(async()=>{if(app.busy||app.modal||document.hidden)return;try{await loadState(false);render()}catch{}},20000);
+ window.setInterval(async()=>{if(app.busy||app.modal||app.reportMode||document.hidden)return;try{await loadState(false);render()}catch{}},20000);
 }
 async function loadState(markLoading=true){
  if(markLoading)app.loading=true;
@@ -79,7 +79,7 @@ function admin(){
  });
  const filterOptions=(app.adminGroup==='startup'?['startup']:['major','employment','general']);
  return `<div class="app-shell">${head()}${cfg.DEMO_MODE?banners().match(/<div class="banner-demo">[\s\S]*?<\/div><\/div>/)?.[0]||'':''}<main class="panel">
- <div class="admin-header"><div><span class="tag">담당자 전용 관리 화면</span><h2>${groupTitle(app.adminGroup)}</h2><p>예약 일정 변경·취소 및 특정 시간 차단을 관리합니다.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="button" data-action="admin-block">＋ 시간 차단</button><button class="button" data-action="export">⇩ CSV 다운로드</button></div></div>
+ <div class="admin-header"><div><span class="tag">담당자 전용 관리 화면</span><h2>${groupTitle(app.adminGroup)}</h2><p>예약 일정 변경·취소 및 특정 시간 차단을 관리합니다.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="button primary" data-action="reports">▤ 모니터링 결과 관리</button><button class="button" data-action="admin-block">＋ 시간 차단</button><button class="button" data-action="export">⇩ CSV 다운로드</button></div></div>
  <div class="stats"><div class="stat"><span>전체 동아리</span><strong>${all.length}</strong></div><div class="stat"><span>예약 완료</span><strong>${bookedCount}</strong></div><div class="stat"><span>미예약</span><strong>${all.length-bookedCount}</strong></div></div>
  <div class="admin-controls"><input class="control" id="admin-search" placeholder="동아리명 검색" value="${esc(app.adminSearch)}" aria-label="동아리명 검색"><select class="control" id="admin-category"><option value="all">전체 유형</option>${filterOptions.map(k=>`<option value="${k}" ${app.adminFilter===k?'selected':''}>${CATEGORIES[k].name}</option>`).join('')}</select><button class="button" data-action="admin-missing">미예약 동아리 보기</button><button class="button" data-action="refresh">↻ 새로고침</button></div>
  <div class="admin-list">${rows.length?`<table class="admin-table"><thead><tr><th>유형</th><th>동아리명</th><th>예약 날짜</th><th>시간</th><th>상태</th><th>관리</th></tr></thead><tbody>${rows.map(r=>{const c=clubById(r.club_id);return `<tr><td>${esc(CATEGORIES[c?.category||'major'].label)}</td><td><strong>${esc(c?.name)}</strong></td><td>${esc(r.reservation_date)}</td><td>${esc(r.reservation_time.slice(0,5))}</td><td><span class="tag ${r.status==='confirmed'?'green':'gray'}">${r.status==='confirmed'?'예약 완료':'취소'}</span></td><td>${r.status==='confirmed'?`<div class="table-actions"><button class="button small" data-action="edit" data-id="${esc(r.id)}">변경</button><button class="button small danger" data-action="cancel" data-id="${esc(r.id)}">취소</button></div>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty-state"><div class="emoji">▤</div>표시할 예약이 없습니다.</div>`}</div>
@@ -134,7 +134,7 @@ function modalHtml(){
  }
  return '';
 }
-function render(){root.innerHTML=(app.adminGroup?admin():home())+modalHtml()+elementToast();if(app.modal?.type==='login')root.querySelector('#staff-code')?.focus()}
+function render(){if(app.reportMode)return;root.innerHTML=(app.adminGroup?admin():home())+modalHtml()+elementToast();if(app.modal?.type==='login')root.querySelector('#staff-code')?.focus()}
 function csvExport(){
  const rows=[['유형','동아리명','방문 날짜','방문 시간','예약 상태']];
  for(const r of [...app.bookings].sort(sortBooking)){
@@ -153,7 +153,14 @@ root.addEventListener('click',async e=>{
  if(!target){const cell=e.target.closest('.date-cell[data-date]');if(cell&&!app.adminGroup&&isSelectable(cell.dataset.date,cfg))openBooking(cell.dataset.date);else if(e.target.id==='modal-shade'&&!app.busy){app.modal=null;render()}return;}
  const {action,value,id,date,time}=target.dataset;
  if(app.busy)return;
- if(action==='category'){app.category=value;app.selectedClub='';app.modal=null;try{await loadState()}catch(ex){flash(ex.message,true)}render();return}
+ if(action==='reports'&&app.adminGroup&&app.token){
+   app.reportMode=true;app.modal=null;
+   const {mountReports}=await import('./reports.js');
+   await mountReports(root,{config:cfg,group:app.adminGroup,token:app.token,bookings:app.bookings,
+    onBack:()=>{app.reportMode=false;render()}});
+   return;
+  }
+  if(action==='category'){app.category=value;app.selectedClub='';app.modal=null;try{await loadState()}catch(ex){flash(ex.message,true)}render();return}
  if(action==='prev'||action==='next'){
   const offset=action==='prev'?-1:1;
   if(app.view==='month')app.month=new Date(app.month.getFullYear(),app.month.getMonth()+offset,1,12);
