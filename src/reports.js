@@ -107,6 +107,7 @@ function dateTimeFor(x){
  return {date:booking?.reservation_date||'',time:(booking?.reservation_time||'').slice(0,5),location:booking?.reservation_location||''};
 }
 function photoHtml(){
+ const photoLocked=state.report?.status==='completed'&&!state.editMode;
  const photos=state.photos.map(p=>'<div class="report-photo-tile" data-photo-id="'+esc(p.id)+'">'+
   '<button type="button" class="report-photo-preview" data-r-action="view-photo" data-id="'+esc(p.id)+'" aria-label="고화질 사진 크게 보기">'+
   (p.preview_url?'<img loading="lazy" src="'+esc(p.preview_url)+'" alt="첨부된 활동 사진" />':'<span class="report-photo-fallback">🖼 사진</span>')+'</button>'+
@@ -118,8 +119,8 @@ function photoHtml(){
   (f.error?'<div class="report-failed-actions"><button type="button" class="button small" data-r-action="retry-photo" data-id="'+esc(f.id)+'">재시도</button><button type="button" class="button small" data-r-action="discard-photo" data-id="'+esc(f.id)+'">제거</button></div>':'')+'</div>').join('');
  return '<div class="report-photos-head"><h3>모니터링 진행 사진</h3><span>서버 보관 '+state.photos.length+'장</span></div>'+
   '<p class="report-helper">동아리당 사진은 정확히 1장입니다. 최대 50MB의 원본을 비공개 저장하며, 새 사진 저장이 성공하면 기존 사진을 교체합니다. 무료 플랜의 전체 사진 저장 한도는 약 850MB입니다.</p>'+
-  '<div class="report-photo-actions"><button type="button" class="button" data-r-action="camera" '+(state.photoUploads.length?'disabled':'')+'>📷 '+(photos?'새 사진 촬영·교체':'카메라로 촬영')+'</button>'+
-  '<button type="button" class="button" data-r-action="gallery" '+(state.photoUploads.length?'disabled':'')+'>▧ '+(photos?'갤러리 사진으로 교체':'갤러리에서 선택')+'</button>'+
+  '<div class="report-photo-actions"><button type="button" class="button" data-r-action="camera" '+(state.photoUploads.length||photoLocked?'disabled':'')+'>📷 '+(photos?'새 사진 촬영·교체':'카메라로 촬영')+'</button>'+
+  '<button type="button" class="button" data-r-action="gallery" '+(state.photoUploads.length||photoLocked?'disabled':'')+'>▧ '+(photos?'갤러리 사진으로 교체':'갤러리에서 선택')+'</button>'+
   '<input id="report-camera-input" type="file" accept="image/*" capture="environment" hidden>'+
   '<input id="report-gallery-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" hidden></div>'+
   (state.pendingPhoto?'<div class="report-banner is-error">이전에 완료되지 않은 사진 업로드가 있습니다. 새 사진을 선택하기 전에 미완료 항목을 정리하세요. <button type="button" class="button small" data-r-action="discard-pending">미완료 업로드 정리</button></div>':'')+
@@ -146,7 +147,7 @@ function editorHtml(){
   '<label class="report-form-row">담당자평가<textarea class="control" data-report-field="staff_evaluation" maxlength="20000" rows="4" placeholder="운영 현황과 점검 결과를 작성해 주세요.">'+esc(d.staff_evaluation)+'</textarea></label>'+
   '<label class="report-form-row">담당자의견<textarea class="control" data-report-field="staff_opinion" maxlength="20000" rows="4" placeholder="개선 필요사항이나 특이사항을 작성해 주세요.">'+esc(d.staff_opinion)+'</textarea></label>'+
   '<label class="report-form-row">미실시 사유 <small>(미실시 처리할 때 작성)</small><textarea class="control" data-report-field="not_conducted_reason" maxlength="3000" rows="2" placeholder="방문하지 못한 사유를 작성해 주세요.">'+esc(d.not_conducted_reason)+'</textarea></label>'+
-  '<div id="report-photo-section" class="report-photo-section">'+photoHtml()+'</div></fieldset>'+
+  '</fieldset><div id="report-photo-section" class="report-photo-section">'+photoHtml()+'</div>'+
   '<div class="report-savebar"><div><strong id="report-save-state">'+esc(completed)+'</strong><small id="report-saved-time">'+(state.report?.updated_at?'최종 저장 '+esc(new Date(state.report.updated_at).toLocaleString('ko-KR')):'저장된 기록 없음')+'</small></div>'+
   '<div class="report-buttons">'+(locked?
    '<button type="button" class="button primary" data-r-action="edit-report">수정하기</button>':
