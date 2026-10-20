@@ -3,7 +3,7 @@
  */
 import {esc,CATEGORIES} from './utils.js';
 
-const TERM='2026-2', MAX_PHOTO=50*1024*1024;
+const TERM='2026-2', MAX_PHOTO=50_000_000;
 let root, config, group, token, onBack, bookings, view, sessionId=0;
 const tabs={integrated:['major','employment','general'],startup:['startup']};
 const statusLabel={missing:'미작성',draft:'작성 중',completed:'작성 완료',not_conducted:'미실시'};
