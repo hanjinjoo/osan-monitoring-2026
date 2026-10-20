@@ -28,6 +28,9 @@ test('기존 예약 API는 공개 일정 조회 유지, 잘못된 사번은 거�
  assert.ok(Array.isArray(parsed.data?.reservations));
  assert.ok(Array.isArray(parsed.data?.blocks));
  assert.ok(parsed.data.reservations.every(r=>r.status==='confirmed'));
+ assert.ok(parsed.data.reservations.every(r=>Object.hasOwn(r,'reservation_location')), 'Every confirmed reservation must return a location field (nullable for legacy bookings)');
+ const englishClass=parsed.data.reservations.find(r=>r.club_id==='general-010'&&r.reservation_date==='2026-10-27'&&r.reservation_time.startsWith('17:00'));
+ if(englishClass)assert.equal(englishClass.reservation_location,'희망관 8204호','Public calendar must show manager-updated place');
  const login=await fetch(schedulerEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'login',code:'not-a-number'})});
  assert.equal(login.status,401);
  const bad=await login.json();assert.equal(bad.ok,false);
