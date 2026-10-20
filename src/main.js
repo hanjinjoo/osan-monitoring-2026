@@ -82,7 +82,7 @@ function admin(){
  <div class="admin-header"><div><span class="tag">담당자 전용 관리 화면</span><h2>${groupTitle(app.adminGroup)}</h2><p>예약 일정 변경·취소 및 특정 시간 차단을 관리합니다.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="button primary" data-action="reports">▤ 모니터링 결과 관리</button><button class="button" data-action="admin-block">＋ 시간 차단</button><button class="button" data-action="export">⇩ CSV 다운로드</button></div></div>
  <div class="stats"><div class="stat"><span>전체 동아리</span><strong>${all.length}</strong></div><div class="stat"><span>예약 완료</span><strong>${bookedCount}</strong></div><div class="stat"><span>미예약</span><strong>${all.length-bookedCount}</strong></div></div>
  <div class="admin-controls"><input class="control" id="admin-search" placeholder="동아리명 검색" value="${esc(app.adminSearch)}" aria-label="동아리명 검색"><select class="control" id="admin-category"><option value="all">전체 유형</option>${filterOptions.map(k=>`<option value="${k}" ${app.adminFilter===k?'selected':''}>${CATEGORIES[k].name}</option>`).join('')}</select><button class="button" data-action="admin-missing">미예약 동아리 보기</button><button class="button" data-action="refresh">↻ 새로고침</button></div>
- <div class="admin-list">${rows.length?`<table class="admin-table"><thead><tr><th>유형</th><th>동아리명</th><th>예약 날짜</th><th>시간</th><th>상태</th><th>관리</th></tr></thead><tbody>${rows.map(r=>{const c=clubById(r.club_id);return `<tr><td>${esc(CATEGORIES[c?.category||'major'].label)}</td><td><strong>${esc(c?.name)}</strong></td><td>${esc(r.reservation_date)}</td><td>${esc(r.reservation_time.slice(0,5))}</td><td><span class="tag ${r.status==='confirmed'?'green':'gray'}">${r.status==='confirmed'?'예약 완료':'취소'}</span></td><td>${r.status==='confirmed'?`<div class="table-actions"><button class="button small" data-action="edit" data-id="${esc(r.id)}">변경</button><button class="button small danger" data-action="cancel" data-id="${esc(r.id)}">취소</button></div>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty-state"><div class="emoji">▤</div>표시할 예약이 없습니다.</div>`}</div>
+ <div class="admin-list">${rows.length?`<table class="admin-table"><thead><tr><th>유형</th><th>동아리명</th><th>예약 날짜</th><th>시간</th><th>장소</th><th>상태</th><th>관리</th></tr></thead><tbody>${rows.map(r=>{const c=clubById(r.club_id);return `<tr><td>${esc(CATEGORIES[c?.category||'major'].label)}</td><td><strong>${esc(c?.name)}</strong></td><td>${esc(r.reservation_date)}</td><td>${esc(r.reservation_time.slice(0,5))}</td><td>${esc(r.reservation_location||"장소 미입력")}</td><td><span class="tag ${r.status==='confirmed'?'green':'gray'}">${r.status==='confirmed'?'예약 완료':'취소'}</span></td><td>${r.status==='confirmed'?`<div class="table-actions"><button class="button small" data-action="edit" data-id="${esc(r.id)}">변경</button><button class="button small danger" data-action="cancel" data-id="${esc(r.id)}">취소</button></div>`:'—'}</td></tr>`}).join('')}</tbody></table>`:`<div class="empty-state"><div class="emoji">▤</div>표시할 예약이 없습니다.</div>`}</div>
  <div class="admin-bottom"><div class="config-tip">미예약 동아리는 '미예약 동아리 보기'에서 확인할 수 있습니다. 신규 예약은 일반 예약 화면에서 신청해 주세요.</div></div>
  </main></div>`;
 }
@@ -99,11 +99,11 @@ function modalHtml(){
  const m=app.modal;if(!m)return '';
  const club=clubById(m.clubId);
  if(m.type==='login')return modalWrap('관리자 모드 로그인',`<p>예약·일정 관리와 모니터링 결과 관리는 담당자만 이용할 수 있습니다. 등록된 담당자 사번을 입력해 주세요.</p><div class="field"><label for="staff-code">담당자 사번</label><input id="staff-code" class="control" type="password" inputmode="numeric" autocomplete="off" placeholder="사번을 입력하세요"></div>${cfg.DEMO_MODE?'<div class="field-help">데모 체험 번호: 통합 900001 / 창업 900002 (실제 사번 아님)</div>':''}${actions('인증하기','confirm-login')}`);
- if(m.type==='booking')return modalWrap('모니터링 일정 예약',`<dl class="summary-box"><div class="summary-row"><dt>동아리 유형</dt><dd>${esc(CATEGORIES[club?.category||app.category].name)}</dd></div><div class="summary-row"><dt>동아리명</dt><dd>${esc(club?.name)}</dd></div><div class="summary-row"><dt>방문 날짜</dt><dd>${esc(dateLabel(m.date))}</dd></div></dl><div class="field"><label for="booking-time">방문 시간</label><select id="booking-time" class="control">${timeOpts(m.date,m.time,club?.reservation_group)}</select><div class="field-help">09:00~17:45 · 15분 간격 · 12:00~13:00 제외</div></div>${actions('예약 신청','booking-confirm')}`);
- if(m.type==='confirm')return modalWrap('예약 내용 최종 확인',`<p>아래 일정으로 예약하시겠습니까?</p><dl class="summary-box"><div class="summary-row"><dt>동아리명</dt><dd>${esc(club?.name)}</dd></div><div class="summary-row"><dt>방문 날짜</dt><dd>${esc(dateLabel(m.date))}</dd></div><div class="summary-row"><dt>방문 시간</dt><dd>${esc(m.time)}</dd></div></dl><p>예약 완료 후 일정 변경 및 취소는 담당자를 통해서만 가능합니다.</p><div class="modal-actions"><button class="button" data-action="back-booking">돌아가기</button><button class="button primary" data-action="commit-booking" ${app.busy?'disabled':''}>${app.busy?'처리 중…':'예약 확정'}</button></div>`);
+ if(m.type==='booking')return modalWrap('모니터링 일정 예약',`<dl class="summary-box"><div class="summary-row"><dt>동아리 유형</dt><dd>${esc(CATEGORIES[club?.category||app.category].name)}</dd></div><div class="summary-row"><dt>동아리명</dt><dd>${esc(club?.name)}</dd></div><div class="summary-row"><dt>방문 날짜</dt><dd>${esc(dateLabel(m.date))}</dd></div></dl><div class="field"><label for="booking-time">방문 시간</label><select id="booking-time" class="control">${timeOpts(m.date,m.time,club?.reservation_group)}</select><div class="field-help">09:00~17:45 · 15분 간격 · 12:00~13:00 제외</div></div><div class="field"><label for="booking-location">모니터링 진행 장소 (필수)</label><input id="booking-location" class="control" maxlength="120" placeholder="예: ○○관 203호, 학생회관 동아리실" value="${esc(m.location||'')}"><div class="field-help">모니터링 담당자가 방문할 수 있도록 실제 활동 장소를 입력해 주세요.</div></div>${actions('예약 신청','booking-confirm')}`);
+ if(m.type==='confirm')return modalWrap('예약 내용 최종 확인',`<p>아래 일정으로 예약하시겠습니까?</p><dl class="summary-box"><div class="summary-row"><dt>동아리명</dt><dd>${esc(club?.name)}</dd></div><div class="summary-row"><dt>방문 날짜</dt><dd>${esc(dateLabel(m.date))}</dd></div><div class="summary-row"><dt>방문 시간</dt><dd>${esc(m.time)}</dd></div><div class="summary-row"><dt>모니터링 진행 장소</dt><dd>${esc(m.location)}</dd></div></dl><p>예약 완료 후 일정 변경 및 취소는 담당자를 통해서만 가능합니다.</p><div class="modal-actions"><button class="button" data-action="back-booking">돌아가기</button><button class="button primary" data-action="commit-booking" ${app.busy?'disabled':''}>${app.busy?'처리 중…':'예약 확정'}</button></div>`);
  if(m.type==='detail'){
   const r=app.bookings.find(x=>x.id===m.id),c=clubById(r?.club_id);if(!r)return '';
-  return modalWrap('모니터링 예약 상세',`<dl class="summary-box"><div class="summary-row"><dt>동아리 분류</dt><dd>${esc(CATEGORIES[c?.category||'major'].name)}</dd></div><div class="summary-row"><dt>동아리명</dt><dd>${esc(c?.name)}</dd></div><div class="summary-row"><dt>방문 날짜</dt><dd>${esc(dateLabel(r.reservation_date))}</dd></div><div class="summary-row"><dt>방문 시간</dt><dd>${esc(r.reservation_time.slice(0,5))}</dd></div></dl><p>일정 변경 또는 취소는 담당자에게 요청해 주세요.</p><div class="modal-actions"><button class="button primary" data-action="close">확인</button></div>`);
+  return modalWrap('모니터링 예약 상세',`<dl class="summary-box"><div class="summary-row"><dt>동아리 분류</dt><dd>${esc(CATEGORIES[c?.category||'major'].name)}</dd></div><div class="summary-row"><dt>동아리명</dt><dd>${esc(c?.name)}</dd></div><div class="summary-row"><dt>방문 날짜</dt><dd>${esc(dateLabel(r.reservation_date))}</dd></div><div class="summary-row"><dt>방문 시간</dt><dd>${esc(r.reservation_time.slice(0,5))}</dd></div><div class="summary-row"><dt>방문 장소</dt><dd>${esc(r.reservation_location||"장소 미입력")}</dd></div></dl><p>일정 변경 또는 취소는 담당자에게 요청해 주세요.</p><div class="modal-actions"><button class="button primary" data-action="close">확인</button></div>`);
  }
  if(m.type==='more'){
   const items=activeBookings().filter(r=>r.reservation_date===m.date).sort(sortBooking);
@@ -111,7 +111,7 @@ function modalHtml(){
  }
  if(m.type==='edit'){
   const r=app.bookings.find(x=>x.id===m.id),c=clubById(r?.club_id);if(!r)return '';
-  return modalWrap('예약 일정 변경',`<p><strong>${esc(c?.name)}</strong> · 현재 ${esc(dateLabel(r.reservation_date))} ${esc(r.reservation_time.slice(0,5))}</p><div class="field"><label for="edit-date">변경할 날짜</label><input id="edit-date" type="date" class="control" min="${cfg.FIRST_DATE}" max="${cfg.LAST_DATE}" value="${esc(m.date)}"></div><div class="field"><label for="edit-time">변경할 시간</label><select id="edit-time" class="control">${timeOpts(m.date,m.time,app.adminGroup,r.id)}</select></div>${actions('변경 확정','commit-edit')}`);
+  return modalWrap('예약 일정 변경',`<p><strong>${esc(c?.name)}</strong> · 현재 ${esc(dateLabel(r.reservation_date))} ${esc(r.reservation_time.slice(0,5))}</p><div class="field"><label for="edit-date">변경할 날짜</label><input id="edit-date" type="date" class="control" min="${cfg.FIRST_DATE}" max="${cfg.LAST_DATE}" value="${esc(m.date)}"></div><div class="field"><label for="edit-time">변경할 시간</label><select id="edit-time" class="control">${timeOpts(m.date,m.time,app.adminGroup,r.id)}</select></div><div class="field"><label for="edit-location">모니터링 진행 장소</label><input id="edit-location" class="control" maxlength="120" placeholder="장소 미입력" value="${esc(m.location??'')}"><div class="field-help">장소만 저장하면 예약 날짜·시간은 그대로 유지됩니다.</div></div><div class="modal-actions"><button class="button" data-action="close">닫기</button><button class="button" data-action="commit-location">장소만 저장</button><button class="button primary" data-action="commit-edit">일정 및 장소 저장</button></div>`);
  }
  if(m.type==='cancel'){
   const r=app.bookings.find(x=>x.id===m.id),c=clubById(r?.club_id);if(!r)return '';
@@ -136,9 +136,9 @@ function modalHtml(){
 }
 function render(){if(app.reportMode)return;root.innerHTML=(app.adminGroup?admin():home())+modalHtml()+elementToast();if(app.modal?.type==='login')root.querySelector('#staff-code')?.focus()}
 function csvExport(){
- const rows=[['유형','동아리명','방문 날짜','방문 시간','예약 상태']];
+ const rows=[['유형','동아리명','방문 날짜','방문 시간','방문 장소','예약 상태']];
  for(const r of [...app.bookings].sort(sortBooking)){
-  const c=clubById(r.club_id);rows.push([CATEGORIES[c?.category||'major'].name,c?.name||'',r.reservation_date,r.reservation_time.slice(0,5),r.status==='confirmed'?'예약 완료':'취소']);
+  const c=clubById(r.club_id);rows.push([CATEGORIES[c?.category||'major'].name,c?.name||'',r.reservation_date,r.reservation_time.slice(0,5),r.reservation_location||'',r.status==='confirmed'?'예약 완료':'취소']);
  }
  const sanitize=s=>{let x=String(s);if(/^[=+@\-\t\r]/.test(x))x="'"+x;return '"'+x.replaceAll('"','""')+'"'};
  const content='\ufeff'+rows.map(r=>r.map(sanitize).join(',')).join('\r\n');
@@ -181,22 +181,23 @@ root.addEventListener('click',async e=>{
  }
  if(action==='logout'){app.adminGroup=null;app.token=null;app.adminSearch='';app.adminFilter='all';try{await loadState()}catch(ex){flash(ex.message,true)}render();return}
  if(action==='booking-confirm'){
-  const time=root.querySelector('#booking-time')?.value;const club=clubById(app.modal?.clubId);
+  const time=root.querySelector('#booking-time')?.value;const club=clubById(app.modal?.clubId);const location=(root.querySelector('#booking-location')?.value||'').trim();if(!location||location.length>120){app.modal.error='모니터링 진행 장소를 120자 이내로 입력해 주세요.';render();return}
   const err=validateReservation(club,app.modal.date,time,app.bookings,app.blocks,cfg);
   if(err){app.modal.error=err;render();return}
-  app.modal={...app.modal,type:'confirm',time,error:null};render();return;
+  app.modal={...app.modal,type:'confirm',time,location,error:null};render();return;
  }
  if(action==='back-booking'){app.modal={...app.modal,type:'booking'};render();return}
- if(action==='commit-booking'){await execute('create',{clubId:app.modal.clubId,date:app.modal.date,time:app.modal.time},'모니터링 일정이 정상적으로 예약되었습니다.');return}
- if(action==='edit'){const r=app.bookings.find(x=>x.id===id);if(!r)return;app.modal={type:'edit',id,date:r.reservation_date,time:r.reservation_time.slice(0,5)};render();return}
+ if(action==='commit-booking'){await execute('create',{clubId:app.modal.clubId,date:app.modal.date,time:app.modal.time,location:app.modal.location},'모니터링 일정이 정상적으로 예약되었습니다.');return}
+ if(action==='edit'){const r=app.bookings.find(x=>x.id===id);if(!r)return;app.modal={type:'edit',id,date:r.reservation_date,time:r.reservation_time.slice(0,5),location:r.reservation_location||''};render();return}
  if(action==='cancel'){app.modal={type:'cancel',id};render();return}
  if(action==='commit-edit'){
   const r=app.bookings.find(x=>x.id===app.modal.id);const c=clubById(r?.club_id);
   const err=validateReservation(c,app.modal.date,app.modal.time,app.bookings,app.blocks,cfg,r?.id);
   if(err){app.modal.error=err;render();return}
-  await execute('update',{token:app.token,reservationId:app.modal.id,date:app.modal.date,time:app.modal.time},'모니터링 일정이 변경되었습니다.');return;
+  await execute('update',{token:app.token,reservationId:app.modal.id,date:app.modal.date,time:app.modal.time,location:app.modal.location},'모니터링 일정이 변경되었습니다.');return;
  }
- if(action==='commit-cancel'){await execute('cancel',{token:app.token,reservationId:app.modal.id},'모니터링 일정이 취소되었습니다.');return}
+ if(action==='commit-location'){const location=(root.querySelector('#edit-location')?.value||'').trim();if(location.length>120){app.modal.error='장소는 120자 이내로 입력해 주세요.';render();return}await execute('update-location',{token:app.token,reservationId:app.modal.id,location},'모니터링 장소를 수정했습니다.');return}
+  if(action==='commit-cancel'){await execute('cancel',{token:app.token,reservationId:app.modal.id},'모니터링 일정이 취소되었습니다.');return}
  if(action==='admin-block'){app.modal={type:'block',date:cfg.FIRST_DATE,time:''};render();return}
  if(action==='commit-block'){
   if(!app.modal.time){app.modal.error='차단할 시간을 선택해 주세요.';render();return}
@@ -224,7 +225,7 @@ function openBooking(date){
  if(!app.selectedClub){flash('먼저 동아리명을 선택해 주세요.',true);return}
  const club=clubById(app.selectedClub);
  if(app.bookings.some(r=>r.status==='confirmed'&&r.club_id===club.id)){flash('해당 동아리는 이미 모니터링 일정이 예약되어 있습니다.',true);return}
- app.modal={type:'booking',clubId:club.id,date,time:''};render();
+ app.modal={type:'booking',clubId:club.id,date,time:'',location:''};render();
 }
 root.addEventListener('change',e=>{
  if(e.target.id==='club-picker'){app.selectedClub=e.target.value;render();return}
@@ -236,7 +237,9 @@ root.addEventListener('change',e=>{
  if(e.target.id==='admin-category'){app.adminFilter=e.target.value;render();return}
 });
 root.addEventListener('input',e=>{
- if(e.target.id==='admin-search'){
+ if(e.target.id==='booking-location'&&app.modal){app.modal.location=e.target.value;return}
+  if(e.target.id==='edit-location'&&app.modal){app.modal.location=e.target.value;return}
+  if(e.target.id==='admin-search'){
   const selection=e.target.selectionStart;app.adminSearch=e.target.value;render();const input=root.querySelector('#admin-search');input?.focus();input?.setSelectionRange(selection,selection);
  }
 });
