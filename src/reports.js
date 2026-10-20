@@ -8,7 +8,7 @@ let root, config, group, token, onBack, onRoutePush, bookings, view, sessionId=0
 const tabs={integrated:['major','employment','general'],startup:['startup']};
 const statusLabel={missing:'미작성',draft:'작성 중',completed:'작성 완료',not_conducted:'미실시'};
 const fmtBytes=n=>n>=1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.max(1,Math.ceil(n/1024))+' KB';
-const selfState=()=>({page:'list',items:[],filter:'all',category:'all',search:'',selected:null,photos:[],pendingPhoto:null,recoverable:null,editMode:false,report:null,draft:null,dirty:false,saving:false,revision:0,photoUploads:[],message:'',error:'',loading:true});
+const selfState=()=>({page:'list',items:[],filter:'all',category:'all',search:'',selected:null,photos:[],pendingPhoto:null,recoverable:null,editMode:false,pendingReplacement:null,report:null,draft:null,dirty:false,saving:false,revision:0,photoUploads:[],message:'',error:'',loading:true});
 let state=selfState(), autosaveTimer=null, activeUploads=new Set();
 function uploadSignedPhoto(url,file,record){
  // Supabase SDK uploadToSignedUrl matches PUT multipart FormData; original bytes preserved.
@@ -123,6 +123,7 @@ function photoHtml(){
   '<input id="report-camera-input" type="file" accept="image/*" capture="environment" hidden>'+
   '<input id="report-gallery-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" hidden></div>'+
   (state.pendingPhoto?'<div class="report-banner is-error">이전에 완료되지 않은 사진 업로드가 있습니다. 새 사진을 선택하기 전에 미완료 항목을 정리하세요. <button type="button" class="button small" data-r-action="discard-pending">미완료 업로드 정리</button></div>':'')+
+  (state.pendingReplacement?'<div class="report-banner">교체할 새 사진: '+esc(state.pendingReplacement.name)+' · 수정사항 저장 후 업로드합니다. 저장 전 수정 취소 시 교체되지 않습니다.</div>':'')+
   '<div class="report-photo-grid">'+(photos+uploading||'<div class="report-empty report-photo-empty">첨부된 사진이 없습니다.</div>')+'</div>'+
   '<p class="report-helper">기존 사진이 있다면 새 사진 저장 성공 전까지 그대로 보존합니다. 작성 완료하려면 사진 1장이 필요해요. 촬영한 사진은 기기와 브라우저에 따라 카메라 앱 또는 카메라 선택 화면이 열릴 수 있습니다.</p>';
 }
@@ -191,7 +192,7 @@ async function loadList(){
  state.items.sort((a,b)=>(a.category||'').localeCompare(b.category||'')||a.name.localeCompare(b.name,'ko'));
 }
 async function open(clubId){
- if(state.dirty&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
+ if((state.dirty||state.pendingReplacement)&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
   if(state.dirty&&!(await save('draft')))return;
  const current=++sessionId;
  state.page='editor';state.selected=clubId;state.loading=true;state.message='';state.error='';state.photoUploads=[];render();
@@ -199,7 +200,7 @@ async function open(clubId){
   const data=await api('report-get',{clubId});
   if(current!==sessionId)return;
   const x=selectedScope(),defaults=dateTimeFor(x);
-  state.report=data.report;state.photos=data.photos;state.pendingPhoto=data.pendingPhoto||null;state.recoverable=data.recoverable||null;state.editMode=false;
+  state.report=data.report;state.photos=data.photos;state.pendingPhoto=data.pendingPhoto||null;state.recoverable=data.recoverable||null;state.editMode=false;state.pendingReplacement=null;
   state.draft={...draftFields(data.report),
    monitoring_date:data.report?.monitoring_date||defaults.date,
    monitoring_time:(data.report?.monitoring_time||defaults.time||'').slice(0,5),monitoring_location:data.report?.monitoring_location||defaults.location};
@@ -271,7 +272,7 @@ async function showList(){
  clearTimeout(autosaveTimer);
  if(state.photoUploads.some(p=>p.error)&&!window.confirm('업로드 실패한 사진이 있습니다. 목록을 나가면 재시도 대상이 사라집니다. 이동하시겠습니까?'))return;
  if(activeUploads.size){setMessage('사진 업로드 중입니다. 완료될 때까지 기다려 주세요.',true);return}
- if(state.dirty&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
+ if((state.dirty||state.pendingReplacement)&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
   if(state.dirty&&!(await save('draft')))return;
  sessionId++;state.page='list';state.selected=null;state.loading=true;render();
  try{await loadList();state.loading=false;state.message='';state.error='';render();return true}catch(e){state.loading=false;state.error=e.message;render();return false}
@@ -279,7 +280,7 @@ async function showList(){
 async function leave(){
  if(state.photoUploads.some(p=>p.error)&&!window.confirm('업로드 실패한 사진이 있습니다. 이 화면을 나가시겠습니까?'))return;
  if(activeUploads.size){setMessage('사진 업로드를 완료한 후 이동해 주세요.',true);return}
- if(state.page==='editor'&&state.dirty&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
+ if(state.page==='editor'&&(state.dirty||state.pendingReplacement)&&state.editMode){setMessage('수정사항 저장 또는 수정 취소를 눌러 주세요.',true);return}
   if(state.page==='editor'&&state.dirty&&!(await save('draft')))return;
  clearTimeout(autosaveTimer);sessionId++;root=null;onBack();return true;
 }
@@ -310,14 +311,19 @@ async function imageUpload(file,existing=null){
   state.photos=[done.photo];state.pendingPhoto=null;
   state.photoUploads=state.photoUploads.filter(p=>p.id!==record.id);
   photoSectionUpdate();
-  setMessage('사진이 안전하게 저장됐습니다.');
+  setMessage('사진이 안전하게 저장됐습니다.');return true;
  }catch(e){
   record.error=true;record.status='업로드 실패: '+(e?.message||'네트워크 연결 확인');
-  photoSectionUpdate();setMessage('사진 저장에 실패했습니다. 실패 항목의 재시도를 눌러 주세요.',true);
+  photoSectionUpdate();setMessage('사진 저장에 실패했습니다. 실패 항목의 재시도를 눌러 주세요.',true);return false;
  }finally{activeUploads.delete(record.id)}
 }
 async function photoFiles(files){
  if(!files?.length)return;
+ if(state.editMode){
+  const file=files[0];
+  if(file.size>MAX_PHOTO||file.size<=0){setMessage('파일당 50MB 이내 사진을 선택해 주세요.',true);return}
+  state.pendingReplacement=file;photoSectionUpdate();return;
+ }
  if(state.photos.length&&!(window.confirm('기존 사진은 새 사진이 정상적으로 업로드된 후 교체됩니다. 계속할까요?')))return;
  await imageUpload(files[0]);
 }
@@ -337,8 +343,12 @@ async function bind(){
   if(action==='reload'){await reload();return}
    if(action==='stat-filter'){state.filter=value;state.category='all';state.search='';render();return}
    if(action==='edit-report'){state.editMode=true;render();return}
-   if(action==='cancel-edit'){state.dirty=false;await open(state.selected);return}
-   if(action==='save-edit'){if(await save('completed'))await open(state.selected);return}
+   if(action==='cancel-edit'){state.dirty=false;state.pendingReplacement=null;await open(state.selected);return}
+   if(action==='save-edit'){
+    if(!await save('completed'))return;
+    if(state.pendingReplacement){const file=state.pendingReplacement;state.pendingReplacement=null;if(!await imageUpload(file))return}
+    await open(state.selected);return;
+   }
    if(action==='delete-report'){
     const x=selectedScope();if(!state.report)return;
     if(!window.confirm(x.name+'의 모니터링 결과 기록을 삭제할까요?\n기존 예약은 유지되고 결과 기록과 사진은 복구할 수 있습니다.'))return;
@@ -402,7 +412,7 @@ async function bind(){
  });
  window.addEventListener('beforeunload',beforeUnload);
 }
-function beforeUnload(e){if(state.dirty||activeUploads.size){e.preventDefault();e.returnValue=''}}
+function beforeUnload(e){if(state.dirty||state.pendingReplacement||activeUploads.size){e.preventDefault();e.returnValue=''}}
 export async function mountReports(element,opts){
  root=element;config=opts.config;group=opts.group;token=opts.token;onBack=opts.onBack;onRoutePush=opts.onRoutePush;bookings=opts.bookings||[];
  state=selfState();state.category='all';state.loading=true;render();
