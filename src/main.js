@@ -3,15 +3,17 @@ import {Service} from './api.js';
 
 const root=document.querySelector('#app');
 const cfg=window.MONITORING_CONFIG || {};
-const app={clubs:[],category:'major',selectedClub:'',month:new Date(2026,9,1,12),weekDate:'2026-10-26',view:'month',bookings:[],blocks:[],modal:null,busy:false,loading:true,adminGroup:null,token:null,adminSearch:'',adminFilter:'all',toast:null,toastTimer:null,updated:null,reportMode:false};
+const app={clubs:[],category:'major',selectedClub:'',month:new Date(2026,9,1,12),weekDate:'2026-10-26',view:'month',bookings:[],blocks:[],modal:null,busy:false,loading:true,adminGroup:null,token:null,adminSearch:'',adminFilter:'all',toast:null,toastTimer:null,updated:null,reportMode:false,route:'home'};
 let service;
-const group=()=>app.adminGroup||CATEGORIES[app.category].group;
+const group=()=>app.route==='home'?CATEGORIES[app.category].group:(app.adminGroup||CATEGORIES[app.category].group);
 const clubById=id=>app.clubs.find(c=>c.id===id);
 const activeBookings=()=>app.bookings.filter(r=>r.status==='confirmed');
 const pillLabel=r=>{const club=clubById(r.club_id);return `${r.reservation_time.slice(0,5)} · ${club?.name||'알 수 없는 동아리'}`};
 const groupTitle=g=>g==='startup'?'창업동아리 모니터링':'전공·취업·일반 통합 모니터링';
 
+function routePush(route){app.route=route;window.history.pushState({osanRoute:route},'', '#'+route)}
 async function init(){
+ window.history.replaceState({osanRoute:'home'},'', '#home');
  try{
   const r=await fetch('./data/clubs.json',{cache:'no-store'});
   if(!r.ok) throw Error('동아리 명단 파일을 불러오지 못했습니다.');
@@ -34,7 +36,7 @@ function elementToast(){return `<div class="toast-area" role="status" aria-live=
 
 function head(){return `<header class="top-head">
  <div class="brand-row"><span class="brand-icon" aria-hidden="true">▦</span><div class="brand-text"><small>OSAN UNIVERSITY · 2026-2</small><h1>모니터링 일정 선택</h1></div></div>
- ${app.adminGroup?`<button class="button" data-action="logout">← 예약 화면으로</button>`:`<button class="button dark" data-action="login">🔒 관리자 모드</button>`}
+ ${app.adminGroup&&app.route!=='home'?`<button class="button" data-action="logout">← 예약 화면으로</button>`:`<button class="button dark" data-action="login">🔒 관리자 모드</button>`}
  </header>`}
 function banners(){return `<section class="notice"><span class="notice-icon" aria-hidden="true">📅</span><div><strong>모니터링 기간 : 2026. 10. 26.(월) ~ 11. 27.(금)</strong><p>동아리를 선택하고 달력에서 날짜를 누른 뒤, 방문 시간을 예약해 주세요. 09:00~18:00 · 15분 간격 · 12:00~13:00 제외</p></div></section>
  ${cfg.DEMO_MODE?`<div class="banner-demo">⚠ <div><strong>데모 모드 · 실제 예약 서버 미연결</strong> — 예약 내용은 이 브라우저에만 저장됩니다. 다른 기기와 공유되지 않으며 실제 운영에는 사용할 수 없습니다.</div></div>`:''}
@@ -134,7 +136,7 @@ function modalHtml(){
  }
  return '';
 }
-function render(){if(app.reportMode)return;root.innerHTML=(app.adminGroup?admin():home())+modalHtml()+elementToast();if(app.modal?.type==='login')root.querySelector('#staff-code')?.focus()}
+function render(){if(app.reportMode)return;root.innerHTML=(app.adminGroup&&app.route!=='home'?admin():home())+modalHtml()+elementToast();if(app.modal?.type==='login')root.querySelector('#staff-code')?.focus()}
 function csvExport(){
  const rows=[['유형','동아리명','방문 날짜','방문 시간','방문 장소','예약 상태']];
  for(const r of [...app.bookings].sort(sortBooking)){
@@ -150,16 +152,17 @@ async function refresh(){try{app.busy=true;render();await loadState();app.busy=f
 
 root.addEventListener('click',async e=>{
  const target=e.target.closest('[data-action]');
- if(!target){const cell=e.target.closest('.date-cell[data-date]');if(cell&&!app.adminGroup&&isSelectable(cell.dataset.date,cfg))openBooking(cell.dataset.date);else if(e.target.id==='modal-shade'&&!app.busy){app.modal=null;render()}return;}
+ if(!target){const cell=e.target.closest('.date-cell[data-date]');if(cell&&app.route==='home'&&isSelectable(cell.dataset.date,cfg))openBooking(cell.dataset.date);else if(e.target.id==='modal-shade'&&!app.busy){app.modal=null;render()}return;}
  const {action,value,id,date,time}=target.dataset;
  if(app.busy)return;
  if(action==='reports'&&app.adminGroup&&app.token){
-   app.reportMode=true;app.modal=null;
+   app.reportMode=true;app.modal=null;routePush('reports');
    try{
     const {mountReports}=await import('./reports.js');
     await mountReports(root,{config:cfg,group:app.adminGroup,token:app.token,bookings:app.bookings,
-     onBack:()=>{app.reportMode=false;render()}});
-   }catch(ex){app.reportMode=false;flash('결과관리 화면을 불러오지 못했습니다: '+(ex.message||ex),true)}
+     onBack:()=>{app.reportMode=false;app.route=window.location.hash.slice(1)||'admin';render()},
+     onRoutePush:routePush});
+   }catch(ex){app.reportMode=false;routePush('admin');flash('결과관리 화면을 불러오지 못했습니다: '+(ex.message||ex),true)}
    return;
   }
   if(action==='category'){app.category=value;app.selectedClub='';app.modal=null;try{await loadState()}catch(ex){flash(ex.message,true)}render();return}
@@ -177,9 +180,9 @@ root.addEventListener('click',async e=>{
  if(action==='login'){app.modal={type:'login'};render();return}
  if(action==='confirm-login'){
   const code=root.querySelector('#staff-code')?.value?.trim();if(!code){app.modal.error='사번을 입력해 주세요.';render();return}
-  startBusy();try{const result=await service.call('login',{code});app.adminGroup=result.group;app.token=result.token;app.adminSearch='';app.adminFilter='all';app.modal=null;await loadState();app.busy=false;flash('담당자 인증이 완료되었습니다.')}catch(ex){modalError(ex)}return;
+  startBusy();try{const result=await service.call('login',{code});app.adminGroup=result.group;app.token=result.token;app.adminSearch='';app.adminFilter='all';app.modal=null;await loadState();app.busy=false;routePush('admin');flash('담당자 인증이 완료되었습니다.')}catch(ex){modalError(ex)}return;
  }
- if(action==='logout'){app.adminGroup=null;app.token=null;app.adminSearch='';app.adminFilter='all';try{await loadState()}catch(ex){flash(ex.message,true)}render();return}
+ if(action==='logout'){routePush('home');app.adminGroup=null;app.token=null;app.adminSearch='';app.adminFilter='all';try{await loadState()}catch(ex){flash(ex.message,true)}render();return}
  if(action==='booking-confirm'){
   const time=root.querySelector('#booking-time')?.value;const club=clubById(app.modal?.clubId);const location=(root.querySelector('#booking-location')?.value||'').trim();if(!location||location.length>120){app.modal.error='모니터링 진행 장소를 120자 이내로 입력해 주세요.';render();return}
   const err=validateReservation(club,app.modal.date,time,app.bookings,app.blocks,cfg);
@@ -245,7 +248,35 @@ root.addEventListener('input',e=>{
 });
 root.addEventListener('keydown',e=>{
  if(e.key==='Escape'&&app.modal&&!app.busy){app.modal=null;render();return}
- if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('date-cell')){e.preventDefault();if(isSelectable(e.target.dataset.date,cfg)&&!app.adminGroup)openBooking(e.target.dataset.date)}
+ if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('date-cell')){e.preventDefault();if(isSelectable(e.target.dataset.date,cfg)&&app.route==='home')openBooking(e.target.dataset.date)}
  if(e.key==='Enter'&&e.target.id==='staff-code'){e.preventDefault();root.querySelector('[data-action="confirm-login"]')?.click()}
 });
+window.addEventListener('popstate',async()=>{
+ const target=window.location.hash.slice(1)||'home';
+ if(app.modal){app.modal=null;history.pushState({osanRoute:app.route},'', '#'+app.route);render();return}
+ if(app.reportMode){
+  const previous=app.route;
+  try{
+   const {navigateReportRoute}=await import('./reports.js');
+   const ok=await navigateReportRoute(target);
+   if(!ok){history.pushState({osanRoute:previous},'', '#'+previous);return}
+   app.route=target;if(!app.reportMode)render();
+  }catch(ex){history.pushState({osanRoute:previous},'', '#'+previous);flash('화면 이동에 실패했습니다: '+ex.message,true)}
+  return;
+ }
+ if(target==='home'){app.route='home';render();return}
+ if(target==='admin'&&app.adminGroup&&app.token){app.route='admin';render();return}
+ if((target==='reports'||target.startsWith('report/'))&&app.adminGroup&&app.token){
+  app.reportMode=true;app.route=target;
+  try{
+   const {mountReports,navigateReportRoute}=await import('./reports.js');
+   await mountReports(root,{config:cfg,group:app.adminGroup,token:app.token,bookings:app.bookings,
+    onBack:()=>{app.reportMode=false;app.route='admin';render()},onRoutePush:routePush});
+   if(target.startsWith('report/'))await navigateReportRoute(target);
+  }catch(ex){app.reportMode=false;routePush('admin');flash(ex.message,true)}
+  return;
+ }
+ history.replaceState({osanRoute:'home'},'', '#home');app.route='home';render();
+});
+
 init();
