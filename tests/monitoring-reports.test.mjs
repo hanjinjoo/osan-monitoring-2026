@@ -106,3 +106,14 @@ test('담당자 로그인 횟수 제한은 사번을 DB에 저장하지 않고 �
  assert.match(loginApi,/if\(action==='create'\)/);
  assert.match(loginApi,/if\(action==='state'\)/);
 });
+
+test('iPhone/Android용 tus 브라우저 번들만 로드하여 File/Blob을 지원한다',()=>{
+ assert.match(frontend,/loadBrowserTus\(\)/);
+ assert.match(frontend,/cdn\.jsdelivr\.net\/npm\/tus-js-client@4\.3\.1\/dist\/tus\.min\.js/);
+ assert.match(frontend,/document\.createElement\('script'\)/);
+ assert.match(frontend,/window\.tus\?\.Upload/);
+ assert.doesNotMatch(frontend,/import\('https:\/\/esm\.sh\/tus-js-client/);
+ assert.match(frontend,/const upload=new tus\.Upload\(file,/);
+ assert.match(frontend,/const signed=record\.photoId/);
+ assert.match(frontend,/await api\('photo-finish'/);
+});
