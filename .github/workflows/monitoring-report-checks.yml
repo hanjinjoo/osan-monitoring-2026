@@ -36,4 +36,5 @@ jobs:
       - name: Deployed reporting API rejects anonymous callers
         env:
           REPORT_API_URL: https://irqovqzrdvqmuuuvxcmt.supabase.co/functions/v1/monitoring-reports
+          SCHEDULER_API_URL: https://irqovqzrdvqmuuuvxcmt.supabase.co/functions/v1/monitoring-api
         run: node --test tests/monitoring-api-live.test.mjs
