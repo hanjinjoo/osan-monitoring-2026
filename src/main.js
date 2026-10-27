@@ -92,7 +92,7 @@ function timeOpts(date, selected, gid, exclude=null){
  return `<option value="">시간을 선택해 주세요</option>`+TIMES.map(t=>{
   const already=app.bookings.some(r=>r.status==='confirmed'&&r.id!==exclude&&r.reservation_group===gid&&r.reservation_date===date&&r.reservation_time.slice(0,5)===t);
   const blocked=app.blocks.some(x=>x.reservation_group===gid&&x.blocked_date===date&&x.blocked_time.slice(0,5)===t);
-  return `<option value="${t}" ${selected===t?'selected':''} ${already||blocked?'disabled':''}>${t}${already?' — 예약 완료':blocked?' — 선택 불가':''}</option>`;
+  return `<option value="${t}" ${selected===t?'selected':''} ${already||blocked?'disabled style="color:#999;background:#eee"':''}>${t}${already?' — 예약 완료':''}</option>`;
  }).join('');
 }
 function modalWrap(title,content){return `<div class="modal-shade" id="modal-shade"><section class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-head"><h2>${esc(title)}</h2><button class="button icon ghost" data-action="close" aria-label="닫기">×</button></div><div class="modal-content">${content}${app.modal?.error?`<div class="inline-error" role="alert">${esc(app.modal.error)}</div>`:''}</div></section></div>`}
