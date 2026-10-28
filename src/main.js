@@ -109,7 +109,7 @@ function modalHtml(){
  }
  if(m.type==='more'){
   const items=activeBookings().filter(r=>r.reservation_date===m.date).sort(sortBooking);
-  return modalWrap(`${dateLabel(m.date)} 예약 내역`,`<p>담당자 그룹에서 예약된 모든 일정입니다.</p>${items.map(r=>{const c=clubById(r.club_id);return `<div class="summary-box"><strong>${esc(r.reservation_time.slice(0,5))} · ${esc(c?.name)}</strong><div class="field-help">${esc(CATEGORIES[c?.category||'major'].name)}</div></div>`}).join('')}${actions('확인','close')}`);
+  return modalWrap(`${dateLabel(m.date)} 예약 내역`,`<p>담당자 그룹에서 예약된 모든 일정입니다.</p>${items.map(r=>{const c=clubById(r.club_id);return `<div class="summary-box"><strong>${esc(r.reservation_time.slice(0,5))} · ${esc(c?.name)}</strong><div class="field-help">${esc(CATEGORIES[c?.category||'major'].name)} · 장소: ${esc(r.reservation_location||'장소 미입력')}</div></div>`}).join('')}${actions('확인','close')}`);
  }
  if(m.type==='edit'){
   const r=app.bookings.find(x=>x.id===m.id),c=clubById(r?.club_id);if(!r)return '';
