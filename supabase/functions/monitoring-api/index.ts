@@ -76,6 +76,9 @@ function requireSlot(date:unknown,time:unknown){
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  if(date<today)throw Error('이미 지난 날짜에는 예약할 수 없습니다.');
 }
+function requireFutureBooking(date:string,time:string){
+ if(Date.parse(`${date}T${time}:00+09:00`)<=Date.now())throw Error('이미 시작되었거나 지난 시간에는 예약할 수 없습니다.');
+}
 Deno.serve(async(req:Request)=>{
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
  if(req.method!=='POST')return json('POST 방식으로 요청해 주세요.',405);
@@ -101,6 +104,7 @@ Deno.serve(async(req:Request)=>{
   if(action==='create'){
    if(typeof body.clubId!=='string'||body.clubId.length>60)return json('동아리를 선택해 주세요.',400);
    requireSlot(body.date,body.time);
+   requireFutureBooking(body.date,body.time);
    const location=cleanLocation(body.location,true);
     return json(await rpc('monitoring_create_booking_with_location',{p_club_id:body.clubId,p_date:body.date,p_time:body.time,p_weekends:weekendEnabled,p_location:location}));
   }
@@ -120,6 +124,7 @@ Deno.serve(async(req:Request)=>{
    if(action==='update'){
     if(!isUuid(body.reservationId))return json('예약 ID가 유효하지 않습니다.',400);
     requireSlot(body.date,body.time);
+    requireFutureBooking(body.date,body.time);
     const location=cleanLocation(body.location,false);
      return json(await rpc('monitoring_update_booking_with_location',{p_id:body.reservationId,p_group:staffGroup,p_date:body.date,p_time:body.time,p_weekends:weekendEnabled,p_location:location}));
    }
@@ -157,3 +162,4 @@ Deno.serve(async(req:Request)=>{
   return json(safe,400);
  }
 });
+
