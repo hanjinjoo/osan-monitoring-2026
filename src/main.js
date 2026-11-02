@@ -1,4 +1,4 @@
-import {CATEGORIES,CATEGORY_KEYS,WEEKDAYS,TIMES,esc,toISO,fromISO,addDays,todaySeoul,isWeekend,isSelectable,dateLabel,sortBooking,validateReservation} from './utils.js';
+import {CATEGORIES,CATEGORY_KEYS,WEEKDAYS,TIMES,esc,toISO,fromISO,addDays,todaySeoul,isWeekend,isSelectable,dateLabel,sortBooking,validateReservation,isSlotStarted} from './utils.js?v=20261102-past-slots';
 import {Service} from './api.js';
 
 const root=document.querySelector('#app');
@@ -90,9 +90,10 @@ function admin(){
 }
 function timeOpts(date, selected, gid, exclude=null){
  return `<option value="">시간을 선택해 주세요</option>`+TIMES.map(t=>{
+  const started=isSlotStarted(date,t);
   const already=app.bookings.some(r=>r.status==='confirmed'&&r.id!==exclude&&r.reservation_group===gid&&r.reservation_date===date&&r.reservation_time.slice(0,5)===t);
   const blocked=app.blocks.some(x=>x.reservation_group===gid&&x.blocked_date===date&&x.blocked_time.slice(0,5)===t);
-  return `<option value="${t}" ${selected===t?'selected':''} ${already||blocked?'disabled style="color:#999;background:#eee"':''}>${t}${already?' — 예약 완료':''}</option>`;
+  return `<option value="${t}" ${selected===t?'selected':''} ${started||already||blocked?'disabled style="color:#999;background:#eee"':''}>${t}${started?' — 마감':already?' — 예약 완료':blocked?' — 예약 불가':''}</option>`;
  }).join('');
 }
 function modalWrap(title,content){return `<div class="modal-shade" id="modal-shade"><section class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-head"><h2>${esc(title)}</h2><button class="button icon ghost" data-action="close" aria-label="닫기">×</button></div><div class="modal-content">${content}${app.modal?.error?`<div class="inline-error" role="alert">${esc(app.modal.error)}</div>`:''}</div></section></div>`}
@@ -195,7 +196,7 @@ root.addEventListener('click',async e=>{
   app.modal={...app.modal,type:'confirm',time,location,error:null};render();return;
  }
  if(action==='back-booking'){app.modal={...app.modal,type:'booking'};render();return}
- if(action==='commit-booking'){await execute('create',{clubId:app.modal.clubId,date:app.modal.date,time:app.modal.time,location:app.modal.location},'모니터링 일정이 정상적으로 예약되었습니다.');return}
+ if(action==='commit-booking'){const err=validateReservation(clubById(app.modal.clubId),app.modal.date,app.modal.time,app.bookings,app.blocks,cfg);if(err){app.modal.error=err;render();return}await execute('create',{clubId:app.modal.clubId,date:app.modal.date,time:app.modal.time,location:app.modal.location},'모니터링 일정이 정상적으로 예약되었습니다.');return}
  if(action==='edit'){const r=app.bookings.find(x=>x.id===id);if(!r)return;app.modal={type:'edit',id,date:r.reservation_date,time:r.reservation_time.slice(0,5),location:r.reservation_location||''};render();return}
  if(action==='cancel'){app.modal={type:'cancel',id};render();return}
  if(action==='delete-cancelled'){
@@ -295,5 +296,19 @@ window.addEventListener('popstate',async()=>{
  }
  history.replaceState({osanRoute:'home'},'', '#home');app.route='home';render();
 });
+
+function refreshStartedSlots(){
+ if(app.busy||app.reportMode||document.hidden)return;
+ const m=app.modal;if(!m||!['booking','edit','confirm'].includes(m.type))return;
+ if(m.time&&isSlotStarted(m.date,m.time)){
+  m.time='';m.error='선택한 시간이 마감되었습니다. 다른 시간을 선택해 주세요.';
+  if(m.type==='confirm')m.type='booking';render();return;
+ }
+ const select=root.querySelector(m.type==='edit'?'#edit-time':'#booking-time');
+ if(select)for(const option of select.options){if(option.value&&isSlotStarted(m.date,option.value)){option.disabled=true;option.textContent=option.value+' — 마감';}}
+}
+window.setInterval(refreshStartedSlots,1000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshStartedSlots()});
+window.addEventListener('focus',refreshStartedSlots);
 
 init();
