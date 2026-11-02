@@ -18,11 +18,13 @@ export function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c=>(
 export function toISO(date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; }
 export function fromISO(s) { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d,12); }
 export function todaySeoul() { return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
+export function isSlotStarted(dateISO,time,now=Date.now()) { return Date.parse(`${dateISO}T${time.slice(0,5)}:00+09:00`) <= Number(now); }
 export function isWeekend(dateISO) { return [0,6].includes(fromISO(dateISO).getDay()); }
 export function isInRange(dateISO, cfg) { return dateISO>=cfg.FIRST_DATE && dateISO<=cfg.LAST_DATE; }
 export function isSelectable(dateISO,cfg) {
   if (!isInRange(dateISO,cfg) || dateISO<todaySeoul()) return false;
   if (isWeekend(dateISO) && cfg.WEEKENDS_ENABLED !== true) return false;
+  if (dateISO===todaySeoul() && TIMES.every(t=>isSlotStarted(dateISO,t))) return false;
   return true;
 }
 export function dateLabel(iso) {
@@ -38,6 +40,7 @@ export function validateReservation(club, date, time, existing, blocked, cfg, ed
   if (date<todaySeoul()) return '이미 지난 날짜에는 예약할 수 없습니다.';
   if (isWeekend(date) && cfg.WEEKENDS_ENABLED !== true) return cfg.WEEKENDS_ENABLED===null ? '주말 예약 운영 여부가 아직 확정되지 않았습니다.' : '주말에는 예약할 수 없습니다.';
   if (!TIMES.includes(time)) return '운영시간(09:00~18:00, 점심시간 제외) 내 15분 단위로 선택해 주세요.';
+  if (isSlotStarted(date,time)) return '이미 시작되었거나 지난 시간에는 예약할 수 없습니다.';
   if (blocked.some(b=>b.reservation_group===club.reservation_group && b.blocked_date===date && b.blocked_time.slice(0,5)===time)) return '담당자가 예약을 차단한 시간입니다.';
   if (existing.some(r=>r.status==='confirmed' && r.id!==editingId && r.club_id===club.id)) return '해당 동아리는 이미 모니터링 일정이 예약되어 있습니다.';
   if (existing.some(r=>r.status==='confirmed' && r.id!==editingId && r.reservation_group===club.reservation_group && r.reservation_date===date && r.reservation_time.slice(0,5)===time)) return '선택한 시간은 이미 예약되었습니다.';
