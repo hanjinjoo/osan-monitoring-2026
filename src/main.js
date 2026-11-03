@@ -127,9 +127,9 @@ function modalHtml(){
  }
  if(m.type==='block'){
   const blocks=[...app.blocks].sort((a,b)=>a.blocked_date.localeCompare(b.blocked_date)||a.blocked_time.localeCompare(b.blocked_time));
-  const wholeDayOption=`<option value="__all_day__" ${m.time==='__all_day__'?'selected':''}>선택한 날짜 전체 차단 (32개 시간)</option>`;
+  const wholeDayOption=`<option value="__all_day__" ${m.time==='__all_day__'?'selected':''}>선택한 날짜의 빈 시간 모두 차단 (예약 유지)</option>`;
   const timeOptions=timeOpts(m.date,m.time,app.adminGroup).replace('</option>',`</option>${wholeDayOption}`);
-  const dayHint=m.time==='__all_day__'?'<div class="field-help">09:00~17:45 전체 32개 시간을 차단합니다(12:00~12:45 제외). 해당 날짜에 기존 예약이 하나라도 있으면 전체 차단은 실행되지 않습니다.</div>':'';
+  const dayHint=m.time==='__all_day__'?'<div class="field-help">선택한 날짜의 09:00~17:45 중 예약되지 않은 시간을 모두 차단합니다(12:00~12:45 제외). 기존 예약과 이미 차단한 시간은 그대로 유지됩니다.</div>':'';
   return modalWrap('담당자 시간 차단',`<p>자신의 예약 그룹에서만 선택한 시간을 예약 불가로 설정합니다.</p><div class="field"><label for="block-date">차단 날짜</label><input class="control" type="date" id="block-date" min="${cfg.FIRST_DATE}" max="${cfg.LAST_DATE}" value="${esc(m.date)}"></div><div class="field"><label for="block-time">차단 시각</label><select id="block-time" class="control">${timeOptions}</select>${dayHint}</div><div class="modal-actions"><button class="button" data-action="close">닫기</button><button class="button primary" data-action="commit-block" ${app.busy?'disabled':''}>시간 차단</button></div><div class="field"><label>현재 차단된 시간 (${blocks.length}개)</label><div class="block-list">${blocks.length?blocks.map(b=>`<span class="block-chip">${esc(b.blocked_date)} ${esc(b.blocked_time.slice(0,5))}<button data-action="unblock" data-date="${esc(b.blocked_date)}" data-time="${esc(b.blocked_time.slice(0,5))}" aria-label="시간 차단 해제">×</button></span>`).join(''):'<span class="subtle">차단된 시간이 없습니다.</span>'}</div></div>`);
  }
  if(m.type==='missing'){
@@ -153,7 +153,7 @@ function csvExport(){
  const url=URL.createObjectURL(new Blob([content],{type:'text/csv;charset=utf-8'}));
  const anchor=document.createElement('a');anchor.href=url;anchor.download=`동아리_모니터링_${app.adminGroup}_${toISO(new Date())}.csv`;document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-async function execute(action,data,msg){startBusy();try{await service.call(action,data);app.modal=null;await loadState();app.busy=false;flash(msg);}catch(e){modalError(e)}}
+async function execute(action,data,msg){startBusy();try{const result=await service.call(action,data);app.modal=null;await loadState();app.busy=false;flash(action==='block-day'?`빈 시간 ${result.newly_blocked_slots}개를 새로 차단했습니다. 기존 예약 ${result.preserved_bookings}건은 유지됩니다.`:msg);}catch(e){modalError(e)}}
 async function refresh(){try{app.busy=true;render();await loadState();app.busy=false;flash('최신 예약 현황을 불러왔습니다.')}catch(e){app.busy=false;flash(e.message,true)}}
 
 root.addEventListener('click',async e=>{
@@ -223,8 +223,8 @@ root.addEventListener('click',async e=>{
  if(action==='commit-block'){
   if(!app.modal.time){app.modal.error='차단할 시간을 선택해 주세요.';render();return}
   if(app.modal.time==='__all_day__'){
-   if(!confirm(`${app.modal.date}의 전체 32개 예약 시간대를 차단하시겠습니까?\n\n이미 확정된 예약이 하나라도 있으면 변경 없이 중단됩니다.`))return;
-   await execute('block-day',{token:app.token,date:app.modal.date,group:app.adminGroup},'선택한 날짜의 전체 예약 시간(32개)이 차단되었습니다.');
+   if(!confirm(`${app.modal.date}의 빈 시간을 모두 차단하시겠습니까?\n\n이미 예약된 시간은 건너뛰고 기존 예약은 그대로 유지합니다.`))return;
+   await execute('block-day',{token:app.token,date:app.modal.date,group:app.adminGroup},'기존 예약은 유지하고 선택한 날짜의 빈 시간을 차단했습니다.');
   }else{
    await execute('block',{token:app.token,date:app.modal.date,time:app.modal.time,group:app.adminGroup},'선택한 시간이 차단되었습니다.');
   }
